@@ -1,0 +1,14 @@
+---
+title: "Bayes Psychometric"
+author: "Alex Knudson"
+date: "9/27/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Bayes Psychometric
+
+This package is largely just a wrapper for `rethinking` by McElreath, which is largly a wrapper for `rstan`. This focus of this package is on simplifying and automating the process of fitting psychometric functions.

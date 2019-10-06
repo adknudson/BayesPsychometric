@@ -1,0 +1,142 @@
+---
+title: "adk-00-project thoughts"
+author: "Alex Knudson"
+date: "October 5, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Goal
+
+The goal of this package is to take the `Rethinking` package by McElreath and wrap it to fit just psychometric functions.
+
+## The model
+
+Given a response $\theta \in [0, 1]$ and a set of predictors $x_1, x_2, \ldots x_p$, we can model a psychometric function as
+
+$$
+\theta = F(\beta_0 + \beta_1x_1 + \ldots +\beta_px_p)
+$$
+
+where $F$ is some sigmoidal function such as the logistic function or the CDF of a Gaussian distributions. We can rewrite the model as
+
+$$
+F^{-1}(\theta) = \beta_0 + \beta_1x_1 + \ldots +\beta_px_p
+$$
+
+If there is only one independent (continuous) variable (say $x_1$) and the rest are categorial or *factor* variables ($x_2, \ldots x_p$), then the model can be written as
+
+$$
+F^{-1}(\theta) = (\alpha_0 + \alpha_2 + \ldots + \alpha_p) + (\beta_0 + \beta_2 + \ldots + \beta_p)\times x_1
+$$
+
+which implicitly assumes that there are no interactions among the categorical variables. This has the advantage of being easier to interpret, as $\alpha_0$ and $\beta_0$ represent the average intercept and response when controlling for all other variables. $\alpha_2 \ldots \alpha_p$ and $\beta_2 \ldots \beta_p$ represent the addative affect of introducing new categories into the model. In this way, one can essentially fit many models by specifying only one!
+
+### Example
+
+Say we have a data set about subjects' detection of audio levels that has three variables (sound intensity, gender, and age group) and a single response (did they hear anything: yes or no). The intensity level is presented to the subjects at fixed values in random orders, and each intensity is presented 5 times throughout the experiment.
+
+Here is what the data summary may look like
+
+| Variable       | Values                                 |
+|----------------|----------------------------------------|
+| Response       | 0 or 1                                 |
+| Intensity (dB) | -10 to 10 in 2 dB increments           |
+| Gender         | male or female                         |
+| Age (years)    | young (<25), middle (25-50), old (>50) |
+
+Altogether, for a single subject, there will be 55 data points. We could also translate the responses into proportions of responses (in which case there would be 11 observations with a new variable, $n$, representing the number of times an intensity is presented), but we will talk more about that later.
+
+# Translating models
+
+## Simplest case: Mimicking `glm`
+
+I want users to be able to specify the call to fit as
+
+```r
+bayes.PF(y ~ x1 + x2,
+         data = data,
+         link = "logit",
+         family = "binomial")
+```
+
+and it will get translated as
+
+\begin{align}
+y &\sim \text{Bin}(n, \theta) \\
+\text{logit}(\theta) &= \alpha_0 + \beta_1 \left(\frac{x_1 - \mu_{x_1}}{\sigma_{x_1}}\right) + \beta_2 \left(\frac{x_2 - \mu_{x_2}}{\sigma_{x_2}}\right) \\
+\alpha_0 &\sim \mathcal{N}(0, 32) \\
+\beta_1, \beta_2 &\sim \mathcal{N}(0, 32)
+\end{align}
+
+Or, for data in binary form, can be called as 
+
+```r
+bayes.PF(y ~ x1 + x2,
+         data = data,
+         link = "logit",
+         family = "bernoulli")
+```
+
+and it will get translated as
+
+\begin{align}
+y &\sim \text{Bern}(\theta) \\
+\text{logit}(\theta) &= \alpha_0 + \beta_1 \left(\frac{x_1 - \mu_{x_1}}{\sigma_{x_1}}\right) + \beta_2 \left(\frac{x_2 - \mu_{x_2}}{\sigma_{x_2}}\right) \\
+\alpha_0 &\sim \mathcal{N}(0, 32) \\
+\beta_1, \beta_2 &\sim \mathcal{N}(0, 32)
+\end{align}
+
+## Complete Pooling 
+
+**All subjects contribute to one model**
+
+
+
+## Partial Pooling
+
+**Each subject has an individual model, while still contributing to a group model**
+
+```r
+bayes.PF(y ~ x1,
+         data = data,
+         link = "logit",
+         family = "binomial",
+         pooling = "partial")
+```
+
+\begin{align}
+y &\sim \text{Bin}(n, \theta) \\
+\text{logit}(\theta) &= (\alpha_0 + \alpha_1[subject]) + (\beta_0 + \beta_1[subject]) \left(\frac{x_1 - \mu_{x_1}}{\sigma_{x_1}}\right) \\
+\alpha_0 &\sim \mathcal{N}(0, 32) \\
+\alpha_1[subject] &\sim \mathcal{N}(0, \sigma_{\alpha_1}) \\
+\beta_0 &\sim \mathcal{N}(0, 32) \\
+\beta_1[subject] &\sim \mathcal{N}(0, \sigma_{\beta_1}) \\
+\sigma_{\alpha_1}, \sigma_{\beta_1} &\sim \text{Cauchy}(0, 10)
+\end{align}
+
+The final fitted parameters consist of a group level estimate, $\alpha_0$ and $\beta_0$, as well as individual estimates, $\alpha_0 + \alpha_1[subject]$ and $\beta_0 + \beta_1[subject]$.
+
+## No Pooling
+
+**One model per subject**
+
+```r
+bayes.PF(y ~ x1,
+         data = data,
+         link = "logit",
+         family = "binomial",
+         pooling = "none")
+```
+
+\begin{align}
+y &\sim \text{Bin}(n, \theta) \\
+\text{logit}(\theta) &= \alpha_1[subject] + \beta_1[subject] \left(\frac{x_1 - \mu_{x_1}}{\sigma_{x_1}}\right) \\
+\alpha_1[subject] &\sim \mathcal{N}(0, 32) \\
+\beta_1[subject] &\sim \mathcal{N}(0, 32) \\
+\end{align}
+
+Notice this is almost the same as the base case, but it has the benefit of being able to estimate the coefficients for all subjects at one time. It just happens that each subject gets their own intercept and slope term without contributing to each other.

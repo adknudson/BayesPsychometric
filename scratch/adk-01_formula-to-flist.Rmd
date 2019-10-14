@@ -235,9 +235,13 @@ f2flist <- function(formula, data, link) {
   
   # Slope terms
   m_slope <- ""
+  fcoefs  <- NULL
   for (nv in numeric_vars) {
     temp <- paste0("b", nv, "_", factor_vars, "[", factor_vars, "]", 
                    collapse = " + ")
+    fcoefs <- c(fcoefs, 
+                paste0("b", nv), 
+                paste0("b", nv, "_", factor_vars, "[", factor_vars, "]"))
     temp <- paste0("b", nv, " + ", temp)
     temp <- paste0("(", temp, ") * ", nv)
     m_slope <- paste0(m_slope, " + ", temp)
@@ -246,29 +250,43 @@ f2flist <- function(formula, data, link) {
   m_slope <- substr(m_slope, 4, nchar(m_slope))
   
   # Intercept terms
+  fintercepts <- NULL
   if (fint) {
     m_intercept <- paste0("a_", factor_vars, "[", factor_vars, "]", 
                        collapse = " + ")
     m_intercept <- paste0("a0 + ", m_intercept)
+    fintercepts <- c(fintercepts, 
+                     "a0", 
+                     paste0("a_", factor_vars, "[", factor_vars, "]"))
     m_lm <- paste0(m_link, " <- ", m_intercept, " + ", m_slope)
   } else {
     m_lm <- paste0(m_link, " <- ", m_slope)
   }
   
+  # Default priors
+  m_priors <- lapply(c(fintercepts, fcoefs), function(var) {
+    paste0(var, " ~ dnorm(0, 32)")
+  })
+  
   model <- list(m_dist,
-                m_lm)
+                m_lm,
+                unlist(m_priors))
+  model <- lapply(model, function(x) parse(text = x)[[1]])
   
   #
   #################
   
-  lapply(model, function(x) parse(text = x)[[1]])
+  list(model = model, 
+       variables = fvars, 
+       intercepts = fintercepts, 
+       coeficients = fcoefs)
 }
 ```
 
 # Test
 
 ```{r, echo=TRUE}
-f2flist(y ~ x1 + x2 + gender + age, dat_bern, "logit")
+(ftest <- f2flist(y ~ x1 + x2 + gender + age, dat_bern, "logit"))
 f2flist(y ~ 0 + x1 + x2 + gender + age, dat_bern, "probit")
 
 f2flist(y|k ~ x1 + x2 + gender + age, dat_binom, "logit")

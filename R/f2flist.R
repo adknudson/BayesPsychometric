@@ -1,60 +1,75 @@
+#' Convert a typical formula to a formula list that map2stan can understand
+#'
+#' @param formula A formula that you would pass to `glm` or similar.
+#' @param data A list or data.frame.
+#' @param link A link function such as "logit" or "probit"
+#' @return A formula list that `rethinking::map2stan` can use.
+#' @examples
+#' # Create a data set
+#' n <- 50
+#' x1 <- runif(n, -1, 1)
+#' x2 <- runif(n, -1, 1)
+#' a <- 0
+#' b1 <- 10
+#' b2 <- -5
+#' p <- 1 / (1 + exp(-(a + b1*x1 + b2*x2)))
+#' y <- rbinom(n, size = 1, prob = p)
+#' size <- sample(3:5, n, TRUE)
+#' y2 <- rbinom(n, size = size, prob = p)
+#' gender <- factor(sample(c("male", "female"), n, TRUE))
+#' age <- factor(sample(c("<40", ">=40"), 50, TRUE), levels = c("<40", ">=40"))
+#'
+#' dat_bern <- data.frame(y = y, x1 = x1, x2 = x2,
+#'                        gender = gender, age = age)
+#' dat_binom <- data.frame(y = y2, k = size, prop = y2 / size,
+#'                         x1 = x1, x2 = x2,
+#'                         gender = gender, age = age)
+#'
+#' # Bernoulli data
+#' f2flist(y ~ x1, dat_bern, "logit")
+#' f2flist(y ~ x1 + x2 + gender, dat_bern, "logit")
+#'
+#' # Binomial data
+#' f2flist(y|k ~ 0 + x1 + age + gender, dat_binom, "logit")
+#' f2flist(y|k ~ x1 + x2, dat_binom, "logit")
+#' @export
 f2flist <- function(formula, data, link) {
 
-  fterms <- terms(formula)
-  fvars  <- attr(fterms, "term.labels")  # names of the variables
-  fint   <- attr(fterms, "intercept")    # default intercept term
-
-  # Preliminary checks
+  # Preliminary checks -------------------------------------------------------
   stopifnot(
-    all(fvars %in% names(data)) # all terms in data
+    link %in% c("logit", "probit")
   )
 
-  fstr <- as.character(formula)
-  rel  <- fstr[1]
-  LHS  <- fstr[2]
-
-  RHS  <- fstr[3]
-  LHS_link <- paste0(link, "(theta)")
-
-  stopi
-
-  response_dist <- "y ~ dbinom(1, theta)"
-  linear_model <- paste0("beta_", fvars, " * ", fvars, collapse = " + ")
-
-  # If there is no intercept, do something logical
-  if (!fint) {
-    NULL
+  # Extract features from formula --------------------------------------------
+  fls <- .extractFromFormula(formula)
+  vars <- fls[["vars"]]
+  LHS <- fls[["LHS"]]
+  if (grepl(pattern = "\\|", LHS)) {
+    data_mode <- "binomial"
+    LHS <- trimws(strsplit(LHS, split = "\\|")[[1]])
+    fls[["LHS"]] <- LHS
+  } else {
+    data_mode <- "bernoulli"
   }
-  prior_intercept <- "alpha_0 ~ dnorm(0, 32)"
 
-  linear_model <- paste("alpha_0 +", linear_model)
-  linear_model <- paste(LHS_link, "<-", linear_model)
+  # Get the class of each column in the model --------------------------------
+  data_classes <- .getDataClasses(fls, data)
 
-  prior_slope <- paste0(paste0("beta_", fvars, collapse = ", "))
-  prior_slope <- paste0("c(", prior_slope, ") ~ dnorm(0, 32)")
+  # Intermediate checks ------------------------------------------------------
 
-  flist <- list(response_dist,
-                linear_model,
-                prior_intercept,
-                prior_slope)
-  lapply(flist, function(x) parse(text = x)[[1]])
+
+  # Build up the formula list ------------------------------------------------
+  m_dist  <- .buildDistributionFormula(fls, data_mode)
+  m_link  <- .buildLinkFormula(fls, data_classes, link)
+  m_terms <- .getModelTerms(fls, data_classes)
+  m_prior <- .buildPriorFormula(m_terms)
+
+  # Convert the strings to calls for rethinking::map2stan --------------------
+  model <- list(m_dist, m_link)
+  model <- c(model, m_prior)
+
+  model <- lapply(model, function(x) parse(text = x)[[1]])
+
+  # Return the model ---------------------------------------------------------
+  model
 }
-
-
-n <- 300
-x <- runif(n, -1, 1)
-a <- 0
-b <- 10
-p <- 1 / (1 + exp(-(a + b*x)))
-y <- rbinom(n, size = 1, prob = p)
-dat <- data.frame(x = x, y = y, p = p)
-
-flist <- f2flist(y ~ 1 + x1 + x2 + x3, dat, "logit")
-flist <- f2flist(y ~ x, dat, "logit")
-
-flist
-
-library(rethinking)
-
-flist.fit <- map2stan(flist, dat, debug = TRUE)
-summary(flist.fit)

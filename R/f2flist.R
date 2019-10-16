@@ -12,7 +12,7 @@
 #' a <- 0
 #' b1 <- 10
 #' b2 <- -5
-#' p <- 1 / (1 + exp(-(a + b1*x1 + b2*x2)))
+#' p <- 1 / (1 + exp(-(a + b1\*x1 + b2\*x2)))
 #' y <- rbinom(n, size = 1, prob = p)
 #' size <- sample(3:5, n, TRUE)
 #' y2 <- rbinom(n, size = size, prob = p)

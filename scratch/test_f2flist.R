@@ -18,7 +18,7 @@ dat_binom <- data.frame(y = y2, k = size, prop = y2 / size, x1 = x1, x2 = x2,
 
 ###################
 devtools::load_all()
-f <- y|k ~ x1 + x2 + gender
+f <- y|k ~ x1
 (fls <- .extractFromFormula(f))
 vars <- fls[["vars"]]
 LHS <- fls[["LHS"]]
@@ -29,6 +29,18 @@ if (grepl(pattern = "\\|", LHS)) {
 } else {
   data_mode <- "bernoulli"
 }
-.getDataClasses(fls, dat_binom)
-f2flist(y|k ~ x1, dat_binom, "logit")
-f2flist(y|k ~ x1 + x2 + age, dat_binom, "logit")
+.getModelTerms(fls, .getDataClasses(fls, dat_binom))
+f2flist(y|k ~ x1 + x2, dat_binom, "logit")
+f2flist(y|k ~ x1 + x2 + age + gender, dat_binom, "logit")
+
+
+
+glm(y ~ x1 + x2, dat_bern, family = binomial("logit"))
+
+test_fit <- bayesPF(y|k ~ x1 + x2, dat_binom, "logit",
+                    iter=4500, warmup=2000, chains=4, cores=4)
+precis(test_fit)
+
+test_fit2 <- bayesPF(y ~ x1 + x2, dat_bern, "logit",
+                     iter=4500, warmup=2000, chains=4, cores=4)
+precis(test_fit2)

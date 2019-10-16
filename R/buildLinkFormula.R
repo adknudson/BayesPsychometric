@@ -14,13 +14,13 @@
   for (nv in numeric_vars) {
     # create the factor coefficients:
     # bvar1_factor1[factor1] + bvar1_factor2[factor2] + ...
-    if (is.null(factor_vars)) {
-      factor_coefs <- NULL
+    if (length(factor_vars) == 0) {
+      factor_coefs <- paste0("b", nv)
     } else {
-    factor_coefs <- paste0("b", nv, "_",
-                           factor_vars, "[", factor_vars, "]",
-                           collapse = " + ")
-    factor_coefs <- paste0("b", nv, " + ", factor_coefs)
+      factor_coefs <- paste0("b", nv, "_",
+                             factor_vars, "[", factor_vars, "]",
+                             collapse = " + ")
+      factor_coefs <- paste0("b", nv, " + ", factor_coefs)
     }
     factor_coefs <- paste0("(", factor_coefs, ") * ", nv)
 
@@ -31,10 +31,14 @@
 
   # Build up a string of the intercept terms. Also store a list of terms
   if (fls[["include_intercept"]]) {
-    m_intercept <- paste0(
-      "a_", factor_vars, "[", factor_vars, "]", collapse = " + "
-    )
-    m_intercept <- paste0("a0 + ", m_intercept)
+    if (length(factor_vars) == 0) {
+      m_intercept <- "a0"
+    } else {
+      m_intercept <- paste0(
+        "a_", factor_vars, "[", factor_vars, "]", collapse = " + "
+      )
+      m_intercept <- paste0("a0 + ", m_intercept)
+    }
     m_lm <- paste0(m_link, " <- ", m_intercept, " + ", m_slope)
   } else {
     m_lm <- paste0(m_link, " <- ", m_slope)

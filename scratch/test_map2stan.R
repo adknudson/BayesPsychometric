@@ -1,4 +1,5 @@
 library(rethinking)
+devtools::load_all()
 
 n <- 100
 x <- runif(n, -1, 1)

@@ -3,7 +3,7 @@
 #' @param data A data.frame or list
 #' @param link A link function such as "logit" or "probit".
 #' @export
-bayesPF <- function(formula, data, link) {
+bayesPF <- function(formula, data, link, ...) {
 
   if (class(formula) == "list") {
     # assume that we are given an flist intended for rethinking::map2stan
@@ -14,5 +14,5 @@ bayesPF <- function(formula, data, link) {
   }
 
   # Fit the model using map2stan
-  rethinking::map2stan(flist, data)
+  rethinking::map2stan(flist, data, ...)
 }

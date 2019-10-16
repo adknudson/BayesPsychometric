@@ -1,0 +1,295 @@
+---
+title: "Formula to Flist"
+author: "Alex Knudson"
+date: "10/12/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      comment = NA)
+
+pacman::p_load(tidyverse, kableExtra)
+
+n <- 50
+x1 <- runif(n, -1, 1)
+x2 <- runif(n, -1, 1)
+a <- 0
+b1 <- 10
+b2 <- -5
+p <- 1 / (1 + exp(-(a + b1*x1 + b2*x2)))
+y <- rbinom(n, size = 1, prob = p)
+size <- sample(3:5, n, TRUE)
+y2 <- rbinom(n, size = size, prob = p)
+gender <- factor(sample(c("male", "female"), n, TRUE))
+age <- factor(sample(c("<40", ">=40"), 50, TRUE), levels = c("<40", ">=40"))
+dat_bern <- data.frame(y = y, x1 = x1, x2 = x2, 
+                       gender = gender, age = age)
+dat_binom <- data.frame(y = y2, k = size, prop = y2 / size, x1 = x1, x2 = x2,
+                        gender = gender, age = age)
+```
+
+# Data Format
+
+Data should either be in binary format
+
+```{r}
+dat_bern %>%
+  sample_n(10) %>%
+  kable(digits = 4) %>%
+  kable_styling(position = "center", full_width = FALSE)
+```
+
+or binomial format
+
+```{r}
+set.seed(15)
+dat_binom %>%
+  sample_n(10) %>%
+  kable(digits = 4) %>%
+  kable_styling(position = "center", full_width = FALSE)
+```
+
+The columns should also only be of the following type: `numeric`, `factor`, or `logical`. Any column that is type `logical` will get treated as a categorical predictor (which McElreath calls *factor* variables). Ordered factors, while not necessary to set, is helpful when appropriate for displaying results.
+
+```{r}
+glimpse(dat_binom)
+```
+
+
+# Simple Syntax
+
+The goal is to keep the syntax for specifying a general linear model as simple and close to the base function as possible. I.e. a user should be able to specify the model as
+
+```r
+bayes_pf(y ~ x1 + x2, dat_bern, link = "logit", type="binary")
+```
+
+and it will translate into 
+
+$$\text{logit}(y) = \alpha_0 + \beta_1 x_1 + \beta_2 x_2$$
+
+Where our function will differ is when including factor variables into the model. The behavior will be to add them into the model as "switches" for the intercept and slope. I.e.
+
+```r
+bayes_pf(y ~ x1 + gender, dat_bern, link = "logit", type="binary")
+```
+
+will translate into the hierarchical model
+
+$$
+\text{logit}(y) = (\alpha_0 + \alpha_1[gender]) + (\beta_0 + \beta_1[gender]) x_1
+$$
+ where $\alpha_0$ is the mean intercept across all combinations of factors, and $\alpha_1$ is a vector of intercepts (one for each factor level). Specifying the full model
+ 
+```r
+bayes_pf(y ~ x1 + x2 + gender + age, dat_bern, link = "logit", type="binary")
+```
+
+gives the model
+
+\begin{align*}
+\text{logit}(y) = &(\alpha_0 + \alpha_1[gender] + \alpha_2[age]) \times 1\\
++ &(\beta_0 + \beta_1[gender] + \beta_2[age]) \times x_1 \\
++ &(\gamma_0 + \gamma_1[gender] + \gamma_2[age]) \times x_2
+\end{align*}
+
+If we don't want an intercept, then we can write
+
+```r
+bayes_pf(y ~ 0 + x1 + x2 + gender + age, dat_bern, link = "logit", type="binary")
+```
+
+\begin{align*}
+\text{logit}(y) = &(\alpha_0 + \alpha_1[gender] + \alpha_2[age]) \times 0\\
++ &(\beta_0 + \beta_1[gender] + \beta_2[age]) \times x_1 \\
++ &(\gamma_0 + \gamma_1[gender] + \gamma_2[age]) \times x_2
+\end{align*}
+
+This is similar to writing four different models (one for each combination of factors). In fact, if you have $k$ factor variables in your model with $c_k$ levels, then the number of "models" will be the product of all the $c_k$'s.
+
+This default translation then treats each numerical predictor as a predictor and each categorical predictor as a contribution to the intercept and to the slopes of each numerical predictor.
+
+# Arguments
+
+**formula**
+
+| Type | Formula format |
+|------|----------------|
+| *Binary* | `response ~ predictor1 + predictor2 + ...` |
+| *Binomial* |  `successes | trials ~ predictor1 + predictor2 + ...` |
+
+```r
+y ~ x
+```
+
+\begin{align*}
+y &\sim \text{Bern}(\theta) \\
+\text{logit}(\theta) &= \alpha + \beta \times x 
+\end{align*}
+
+```r
+y|k ~ x
+```
+
+\begin{align*}
+y &\sim \text{Bin}(k, \theta) \\
+\text{logit}(\theta) &= \alpha + \beta \times x 
+\end{align*}
+
+**data**
+
+Either a list, data.frame, or an object that can be coerced into a data.frame.
+
+**link**
+
+Some kind of sigmoidal link such as logit or inverse cdf of the normal distribution.
+
+# Optional Arguments
+
+**pooling**
+
+One of "none" (default), "partial", or "complete".
+
+# Scratch Work
+
+```{r, echo=TRUE}
+f2flist <- function(formula, data, link) {
+  
+  #################
+  # Process the formula
+  
+  fstr <- as.character(formula)
+  fterm <- terms(formula)
+  fvars <- attr(fterm, "term.labels")
+  fint  <- as.logical(attr(fterm, "intercept"))
+  
+  # Make sure that all variables are present in the data
+  stopifnot(
+    all(fvars %in% names(data))
+  )
+  
+  LHS  <- fstr[2]
+  # Case of binomial data y ~ Bin(k, p)
+  # y successes given k trials
+  # CHECK: y[i] <= k[i] for all i=1...N
+  # CHECK: y, k are non-negative integers
+  type <- ifelse(grepl(pattern = "\\|", LHS), "binomial", "bernoulli")
+  LHS  <- trimws(strsplit(LHS, split = "\\|")[[1]])
+  # Probably don't need RHS
+  # RHS  <- fstr[3]
+  
+  # Ensure that the response variables are in the data
+  stopifnot(
+    all(LHS %in% names(data))
+  )
+  
+  #
+  #################
+  
+  #---------------------------------------------------------------------------
+  
+  #################
+  # Process the data
+  
+  data_classes <- lapply(data, class)
+  # All response variables must be integers
+  stopifnot(
+    all(data_classes[LHS] == "integer")
+  )
+  # Ensure that none of the predictors are character type
+  stopifnot(
+    any(!(data_classes[fvars] %in% "character"))
+  )
+  
+  factor_vars <- subset(fvars, data_classes[fvars] == "factor")
+  numeric_vars <- subset(fvars, data_classes[fvars] != "factor")
+  
+  #
+  #################
+  
+  #---------------------------------------------------------------------------
+  
+  #################
+  # Check the link function
+  stopifnot(
+    link %in% c("logit", "probit")
+  )
+  #
+  #################
+  
+  #---------------------------------------------------------------------------
+  
+  #################
+  # Build the flist
+  
+  # Distribution line: y ~ dbinom(k, p)
+  if (type == "bernoulli") {
+    m_dist <- paste0(LHS, " ~ dbinom(1, theta)")
+  } else {
+    m_dist <- paste0(LHS[1], " ~ dbinom(", LHS[2], ", theta)")
+  }
+  
+  # link function
+  m_link <- paste0(link, "(theta)")
+  
+  # Slope terms
+  m_slope <- ""
+  fcoefs  <- NULL
+  for (nv in numeric_vars) {
+    temp <- paste0("b", nv, "_", factor_vars, "[", factor_vars, "]", 
+                   collapse = " + ")
+    fcoefs <- c(fcoefs, 
+                paste0("b", nv), 
+                paste0("b", nv, "_", factor_vars, "[", factor_vars, "]"))
+    temp <- paste0("b", nv, " + ", temp)
+    temp <- paste0("(", temp, ") * ", nv)
+    m_slope <- paste0(m_slope, " + ", temp)
+  }
+  # Remove the extra '+' at the beginning
+  m_slope <- substr(m_slope, 4, nchar(m_slope))
+  
+  # Intercept terms
+  fintercepts <- NULL
+  if (fint) {
+    m_intercept <- paste0("a_", factor_vars, "[", factor_vars, "]", 
+                       collapse = " + ")
+    m_intercept <- paste0("a0 + ", m_intercept)
+    fintercepts <- c(fintercepts, 
+                     "a0", 
+                     paste0("a_", factor_vars, "[", factor_vars, "]"))
+    m_lm <- paste0(m_link, " <- ", m_intercept, " + ", m_slope)
+  } else {
+    m_lm <- paste0(m_link, " <- ", m_slope)
+  }
+  
+  # Default priors
+  m_priors <- lapply(c(fintercepts, fcoefs), function(var) {
+    paste0(var, " ~ dnorm(0, 32)")
+  })
+  
+  model <- list(m_dist,
+                m_lm,
+                unlist(m_priors))
+  model <- lapply(model, function(x) parse(text = x)[[1]])
+  
+  #
+  #################
+  
+  list(model = model, 
+       variables = fvars, 
+       intercepts = fintercepts, 
+       coeficients = fcoefs)
+}
+```
+
+# Test
+
+```{r, echo=TRUE}
+(ftest <- f2flist(y ~ x1 + x2 + gender + age, dat_bern, "logit"))
+f2flist(y ~ 0 + x1 + x2 + gender + age, dat_bern, "probit")
+
+f2flist(y|k ~ x1 + x2 + gender + age, dat_binom, "logit")
+f2flist(y|k ~ 0 + x1 + x2 + gender + age, dat_binom, "probit")
+```
+

@@ -12,9 +12,146 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
+
+library(tidyverse)
+library(kableExtra)
+devtools::load_all()
 ```
 
 ```{r setup}
 library(BayesPsychometric)
 ```
 
+## Introduction
+
+This package is meant to provide researchers and others the tools necessary to analyze psychometric data; specifically data that can be represented by a psychometric function. Where we think this package distinguishes itself is that instead of using common frequentist methods to fit the data to a model, we implement a Bayesian hierarchical framework that allows for flexible modeling between categorical effects (see the section on *pooling*).
+
+When using this package, one must be preemptive and make sure that the data is processed and represented in a specific way.
+
+**Warning** *This package makes assumptions about the abstracted model based on the type of data in the formula.*
+
+I would also like to now mention [Richard McElreath](https://xcelab.net/rm/) who is the main inspiration for this package and whose book *Statistical Rethinking* has been most influential. His `R` package, `rethinking` is the basis on which this one is derived. In fact, this package is simply a wrapper for `rethinking`, and provides a simple syntax for specifying a logistic formula and outputting a formula list that `rethinking::map2stan()` can use.
+
+If you need more flexibility in specifying a hierarchical model, I recommend `rethinking` first before moving on to `rstan` which is the basis for his package.
+
+### Data
+
+In a psychometric experiment, there is usually a contrast or intensity level that is being varied, and a response from a subject is recorded as a binary outcome or proportion of positive responses. `BayesPsychometric` can handle either type of data, and we will give two examples here of what a typical data set should look like. The code below generates two arbitrary data sets. One with binary response data, and the other with binomial response data (*k* successes in *n* trials).
+
+```{r}
+set.seed(1331)
+# Number of observations
+n <- 60
+
+# Two continuous predictors (E.g. contrast or intensity)
+x1 <- runif(n, -1, 1)
+x2 <- runif(n, -1, 1)
+
+# "True" (and prior unknown) parameters of the model
+a <- 0
+b1 <- 10
+b2 <- -5
+
+# Underlying probability (also prior unknown)
+p <- 1 / (1 + exp(-(a + b1*x1 + b2*x2)))
+
+# Simulated collected binary response data
+y <- rbinom(n, size = 1, prob = p)
+
+# Simulated collected binomial response data
+# E.g the number of positive responses in k trials
+size <- sample(3:5, n, TRUE)
+y2 <- rbinom(n, size = size, prob = p)
+
+# Possible categorical data columns
+gender <- factor(sample(c("male", "female"), n, TRUE))
+age <- factor(sample(c("<25", "25-50", ">50"), n, TRUE), 
+              levels = c("<25", "25-50", ">50"), ordered = TRUE)
+
+# Putting them together into a data frame
+dat_bern <- data.frame(y = y, x1 = x1, x2 = x2,
+                       gender = gender, age = age)
+dat_binom <- data.frame(y = y2, k = size, prop = y2 / size, x1 = x1, x2 = x2,
+                        gender = gender, age = age)
+```
+
+Here is a glimpse at the two data sets:
+
+```{r}
+glimpse(dat_bern)
+glimpse(dat_binom)
+```
+
+The first thing to note is that the categorical data are explicitly made into factor variables, and if there is an implied order to the categories then they should be ordered if for nothing other than tidy output later on. Character type columns will not work in the model, and **will not** be implicitly coerced into factors, and the function will complain before allowing a model to be fit.
+
+## Fitting the Data
+
+### Using GLM
+
+Lets start with an example of how to fit this data using the base `R` function `glm`.
+
+**Model with no factors**
+
+```{r}
+glm(y ~ x1 + x2, data = dat_bern, family = binomial(link = "logit"))
+```
+
+**Model with factors**
+
+```{r}
+glm(y ~ x1 + x2 + gender + age, data = dat_bern, 
+    family = binomial(link = "logit"))
+```
+
+We wanted to keep the formula syntax as consistent as possible within `BayesPsychometric`, but also to extend it in a way that makes interpreting the results easier than the base function. The key is how the `bayesPF` treats continuous (numerical) predictors and categorical (factor) variables. In a general linear model, we say $y$ is a response to $x$ ($y \sim x$) which we translate to the equation
+
+$$y = \alpha + \beta x$$
+
+When we have categorical data in our model, the past technique has been to introduce dummy variables. This isn't too much of a problem when there are only two categories, but when there are three or more, the model becomes overly complex. The goal is to see if the levels in a category have different strength of effect on the response. I.e $y \sim x + \text{gender}$ translates into
+
+$$y = \alpha + \beta_1 \times x + \beta_2 \times \text{gender} + \beta_3 \times x \times \text{gender}$$
+
+When a subject is male ($\text{gender}=0$) the model simplifies to $y = \alpha + \beta_1 x$ and when a subject is female ($\text{gender}=1$), the model simplifies to $y = (\alpha + \beta_2) + (\beta_1 + \beta_3) x$
+
+It's easy to see how with three or more categories, we are simply turning off and on additive slopes and intercepts in the model. Hierarchical models handle this idea elagantly by essentially fitting an additive slope and intercept term for each level in each factor, vastly simplifying the notation.
+
+### Using bayesPF
+
+There are two ways to use `bayesPF`. The first is with binary data as with the `glm` examples above. The second is with binomial data, for which there is a slight change in syntax.
+
+**Binary model with no factors**
+
+```{r}
+# Currently rstan and rethinking need to be loaded for bayesPF to work
+library(rstan)
+library(rethinking)
+m1.1 <- bayesPF(y ~ x1 + x2, data = dat_bern, link = "logit")
+
+# function from the rethinking package for model summary
+precis(m1.1)
+```
+
+**Binary model with factors**
+
+```{r}
+m1.2 <- bayesPF(y ~ x1 + x2 + gender + age, data = dat_bern, link = "logit")
+precis(m1.2, depth = 2) 
+```
+
+**Binomial model with no factors**
+
+First model with any change in syntax. Now instead of a 0 or 1 outcome, it is an integer coming from a binomial distribution with some unknown underlying probability, $p$. The outcome depends on the size of the draw and the probability, so in this case, we can say $y$ depends on the size, $k$.
+
+$$y_{|k} \sim x$$
+
+```{r}
+m2.1 <- bayesPF(y|k ~ x1 + x2, data = dat_binom, link = "logit")
+precis(m2.1) 
+```
+
+**Binary model with factors**
+
+```{r}
+m2.2 <- bayesPF(y|k ~ x1 + x2 + gender + age, data = dat_binom, link = "logit")
+precis(m2.2, depth = 2) 
+```

@@ -1,4 +1,4 @@
-n <- 50
+n <- 150
 x1 <- runif(n, -1, 1)
 x2 <- runif(n, -1, 1)
 a <- 0
@@ -9,7 +9,8 @@ y <- rbinom(n, size = 1, prob = p)
 size <- sample(3:5, n, TRUE)
 y2 <- rbinom(n, size = size, prob = p)
 gender <- factor(sample(c("male", "female"), n, TRUE))
-age <- factor(sample(c("<40", ">=40"), 50, TRUE), levels = c("<40", ">=40"))
+age <- factor(sample(c("<25", "25-50", ">50"), n, TRUE),
+              levels = c("<25", "25-50", ">50"), ordered = TRUE)
 dat_bern <- data.frame(y = y, x1 = x1, x2 = x2,
                        gender = gender, age = age)
 dat_binom <- data.frame(y = y2, k = size, prop = y2 / size, x1 = x1, x2 = x2,
@@ -18,7 +19,7 @@ dat_binom <- data.frame(y = y2, k = size, prop = y2 / size, x1 = x1, x2 = x2,
 
 ###################
 devtools::load_all()
-f <- y|k ~ x1
+f <- y|k ~ x1 + x2 + gender + age
 (fls <- .extractFromFormula(f))
 vars <- fls[["vars"]]
 LHS <- fls[["LHS"]]
@@ -29,6 +30,7 @@ if (grepl(pattern = "\\|", LHS)) {
 } else {
   data_mode <- "bernoulli"
 }
+.getDataClasses(fls, dat_binom)
 .getModelTerms(fls, .getDataClasses(fls, dat_binom))
 f2flist(y|k ~ x1 + x2, dat_binom, "logit")
 f2flist(y|k ~ x1 + x2 + age + gender, dat_binom, "logit")

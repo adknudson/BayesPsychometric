@@ -72,4 +72,13 @@ f2flist <- function(formula, data, link) {
 
   # Return the model ---------------------------------------------------------
   model
+
+  # Break the function so that I'll remember to fix this issue:
+  # Factors need to be converted to their integer values in order for the
+  # map2stan model to work properly.
+  print(fix_the_issue_stated_above_in_f2flist_line_76)
+  # Create new columns from factor columns called FVAR_levels
+  # create a data list from the data frame: as.list(as.data.frame(dat))
+  # add new list items with the number of levels for each factor and call
+  # them N_FVAR_levels as well as the total number of rows, N
 }

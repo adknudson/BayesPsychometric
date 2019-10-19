@@ -33,7 +33,7 @@
 #' f2flist(y|k ~ 0 + x1 + age + gender, dat_binom, "logit")
 #' f2flist(y|k ~ x1 + x2, dat_binom, "logit")
 #' @export
-f2flist <- function(formula, data, link) {
+f2stan <- function(formula, data, link) {
 
   # Preliminary checks -------------------------------------------------------
   stopifnot(
@@ -42,14 +42,11 @@ f2flist <- function(formula, data, link) {
 
   # Extract features from formula --------------------------------------------
   fls <- .extractFromFormula(formula)
-  vars <- fls[["vars"]]
-  LHS <- fls[["LHS"]]
-  if (grepl(pattern = "\\|", LHS)) {
-    data_mode <- "binomial"
-    LHS <- trimws(strsplit(LHS, split = "\\|")[[1]])
-    fls[["LHS"]] <- LHS
+  if (grepl(pattern = "\\|", fls[["LHS"]])) {
+    fls[["data_mode"]] <- "binomial"
+    fls[["LHS"]] <- trimws(strsplit(fls[["LHS"]], split = "\\|")[[1]])
   } else {
-    data_mode <- "bernoulli"
+    fls[["data_mode"]] <- "bernoulli"
   }
 
   # Get the class of each column in the model --------------------------------
@@ -59,26 +56,16 @@ f2flist <- function(formula, data, link) {
 
 
   # Build up the formula list ------------------------------------------------
-  m_dist  <- .buildDistributionFormula(fls, data_mode)
+  m_dist  <- .buildDistributionFormula(fls, link)
   m_link  <- .buildLinkFormula(fls, data_classes, link)
   m_terms <- .getModelTerms(fls, data_classes)
   m_prior <- .buildPriorFormula(m_terms)
 
   # Convert the strings to calls for rethinking::map2stan --------------------
-  model <- list(m_dist, m_link)
-  model <- c(model, m_prior)
-
-  model <- lapply(model, function(x) parse(text = x)[[1]])
+  model <- list(mode = m_dist,
+                linear_model = m_link,
+                priors = m_prior)
 
   # Return the model ---------------------------------------------------------
   model
-
-  # Break the function so that I'll remember to fix this issue:
-  # Factors need to be converted to their integer values in order for the
-  # map2stan model to work properly.
-  print(fix_the_issue_stated_above_in_f2flist_line_76)
-  # Create new columns from factor columns called FVAR_levels
-  # create a data list from the data frame: as.list(as.data.frame(dat))
-  # add new list items with the number of levels for each factor and call
-  # them N_FVAR_levels as well as the total number of rows, N
 }

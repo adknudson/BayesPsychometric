@@ -5,14 +5,8 @@
 #' @export
 bayesPF <- function(formula, data, link, ...) {
 
-  if (class(formula) == "list") {
-    # assume that we are given an flist intended for rethinking::map2stan
-    flist <- formula
-  } else {
-    # Create an flist from the formula given the data and link function
-    flist <- f2flist(formula, data, link)
-  }
+  stan_model <- f2stan(formula, data, link)
 
-  # Fit the model using map2stan
-  rethinking::map2stan(flist, data, ...)
+  rstan::stan(model_code = stan_model, ...)
+
 }

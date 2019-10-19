@@ -40,9 +40,6 @@ dc_mxmk <- list(numeric_vars =c("x1", "x2"), factor_vars =c("k1", "k2", "k3"))
 .buildLinearModel(dc_mxmk, 0)
 .buildLinearModel(dc_mxmk, 1)
 
-dc_big <- list(numeric_vars =paste0("x", 1:5), factor_vars =paste0("k", 1:10))
-cat(.buildLinearModel(dc_big, 0))
-cat(.buildLinearModel(dc_big, 1))
 
 #########################
 
@@ -61,7 +58,7 @@ age <- factor(sample(c("<25", "25-50", ">50"), n, TRUE),
               levels = c("<25", "25-50", ">50"), ordered = TRUE)
 dat_bern <- data.frame(y = y, x1 = x1, x2 = x2,
                        gender = gender, age = age)
-dat_binom <- data.frame(y = y2, factor_vars =size, prop = y2 / size, x1 = x1, x2 = x2,
+dat_binom <- data.frame(y = y2, k = size, prop = y2 / size, x1 = x1, x2 = x2,
                         gender = gender, age = age)
 
 
@@ -82,3 +79,4 @@ if (grepl(pattern = "\\|", LHS)) {
 (dc <- .getDataClasses(fls, dat_binom))
 
 .buildLinearModel(dc, fls[["include_intercept"]])
+

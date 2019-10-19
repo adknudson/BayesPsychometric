@@ -8,7 +8,7 @@
   numeric_vars <- data_classes[["numeric_vars"]]
 
   m_link <- paste0(link, "(theta)")
-  m_lm <- .buildLinearModel(data_classes, fls[["intercept"]])
+  m_lm <- .buildLinearModel(data_classes, fls[["include_intercept"]])
 
   paste0(m_link, " <- ", m_lm)
 

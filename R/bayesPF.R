@@ -13,6 +13,8 @@ bayesPF <- function(formula, data, link, ...) {
     flist <- f2flist(formula, data, link)
   }
 
+  data <- .factorLevelsToIntegers(formula, data)
+
   # Fit the model using map2stan
   rethinking::map2stan(flist, data, ...)
 }

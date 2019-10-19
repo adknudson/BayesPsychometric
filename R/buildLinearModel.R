@@ -6,6 +6,7 @@
   has_numeric <- length(nv) > 0
   has_factor <- length(fv) > 0
 
+  has_intercept <- intercept
 
   if (!has_numeric && !has_factor && !has_intercept) {
     # y ~ 0

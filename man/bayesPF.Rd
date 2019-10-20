@@ -4,7 +4,8 @@
 \alias{bayesPF}
 \title{Fits a psychometric function}
 \usage{
-bayesPF(formula, data, link, ...)
+bayesPF(formula, data, link, chains = 1, iter = 2000, warmup = NULL,
+  thin = 1, sample = TRUE, cores = 1, seed = NULL)
 }
 \arguments{
 \item{formula}{A formula that one would pass to `glm` or similar.}

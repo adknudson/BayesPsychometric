@@ -15,6 +15,6 @@
     stop("Link function not recognized. Must be either 'logit' or 'probit'.")
   }
 
-  paste0(m_prob, " <- ", m_lm)
+  paste0(m_prob, " = ", m_lm)
 
 }

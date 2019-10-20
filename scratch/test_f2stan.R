@@ -22,23 +22,9 @@ devtools::load_all()
 f <- f2stan(y|k ~ x1 + gender, dat_binom, "logit")
 cat(f$StanCode)
 
-bayesPF(y|k ~ x1 + x2 + gender + age, dat_binom, "logit", chains = 2)
+fit <- bayesPF(y|k ~ x1 + x2, dat_binom, "logit", chains = 2, cores = 2,
+               iter = 8000, warmup = 2000)
 
+fit.samples <- extract(fit)
 
-
-init_list <- list(
-  a1 = rep(0, 50),
-  a2 = rep(0, 50),
-  a3 = rep(0, 50),
-  b1 = rep(0, 50),
-  b2 = rep(0, 50),
-  b3 = rep(0, 50),
-  mu_a1 = 0,
-  mu_a2 = 0,
-  mu_a3 = 0,
-  mu_b1 = 0,
-  mu_b2 = 0,
-  mu_b3 = 0
-)
-
-replicate(2, init_list, simplify = FALSE)
+hist(fit.samples$bx2, breaks = 50)

@@ -3,11 +3,36 @@
 #' @param data A data.frame or list
 #' @param link A link function such as "logit" or "probit".
 #' @export
+#' @examples
+#' # Build an arbitrary data set
+#' n <- 300
+#' x1 <- runif(n, -1, 1)
+#' x2 <- sample((-n%/%2):(n%/%2), n, TRUE)
+#' a <- 0.6
+#' b1 <- -4.2
+#' b2 <- -0.005
+#' p <- 1 / (1 + exp(-(a + b1*x1 + b2*x2)))
+#' y <- rbinom(n, size = 1, prob = p)
+#' size <- sample(3:5, n, TRUE)
+#' y2 <- rbinom(n, size = size, prob = p)
+#' gender <- factor(sample(c("male", "female"), n, TRUE))
+#' age <- factor(sample(c("<25", "25-50", ">50"), n, TRUE),
+#'               levels = c("<25", "25-50", ">50"), ordered = TRUE)
+#' dat_bern <- data.frame(y = y, x1 = x1, x2 = x2,
+#'                        gender = gender, age = age)
+#' dat_binom <- data.frame(y = y2, k = size, prop = y2 / size, x1 = x1, x2 = x2,
+#'                         gender = gender, age = age)
+#'
+#' fit <- bayesPF(y|k ~ x1 + x2 + age, dat_binom, "logit",
+#'                chains = 2, cores = 2, iter = 8000, warmup = 2000)
+#' fit.samples <- extract(fit)
+#' hist(fit.samples$bx2, breaks = 50)
 bayesPF <- function(formula, data, link,
-                    chains = 1, iter = 2000, warmup = NULL, thin = 1,
-                    sample = TRUE, cores = 1, seed = NULL, ...) {
+                    chains = 1, iter = 2000, warmup = 1000, thin = 1,
+                    sample = TRUE, cores = 1, ...) {
 
   require(rstan)
+
   concat <- function(...) {
     paste(..., collapse = "", sep = "")
   }
@@ -25,7 +50,7 @@ bayesPF <- function(formula, data, link,
     cores <- 1
   }
   options(mc.cores = min(as.integer(cores), parallel::detectCores()))
-  rstan_options(auto_write = TRUE)
+  rstan::rstan_options(auto_write = TRUE)
 
   # Parameter inits -------------------
   inits <- list()
@@ -61,7 +86,7 @@ bayesPF <- function(formula, data, link,
   }
 
   # Sending all arguments to stan --------------------------------------------
-  stan(
+  rstan::stan(
     model_name = "BayesPF",
     model_code = model_code,
     data       = data,
@@ -69,6 +94,5 @@ bayesPF <- function(formula, data, link,
     iter       = iter,
     warmup     = warmup,
     chains     = chains,
-    thin       = thin,
-    seed       = seed, ...)
+    thin       = thin, ...)
 }

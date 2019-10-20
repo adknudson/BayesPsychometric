@@ -7,55 +7,75 @@
   has_factor <- length(fv) > 0
 
   if (!has_numeric && !has_factor && !has_intercept) {
+
     # y ~ 0
     stop("ERROR: You cannot specify an empty model")
+
   } else if (has_numeric && !has_factor && !has_intercept ) {
-    # y ~ x
-    bxi <- paste0("b", nv)
-    bxi <- paste0(bxi, " * ", nv, collapse = " + ")
-    return(bxi)
+
+    # y ~ b1*x1 + b2*x2 + ...
+    # creates: bx1, bx2, ...
+    m <- paste0("b", nv)
+    # creates: bx1*x1 + bx2*x2 + ...
+    m <- paste0(m, " * ", nv, "[i]", collapse = " + ")
+    return(m)
+
   } else if (!has_numeric && has_factor && !has_intercept) {
-    # y ~ k
-    print("WARNING: Specifying to have no intercept and only factor variables is a contradiction. The intercept will be included and estimates will be aggregated at the end.")
-    return(
-      paste0("a0 + ",
-             paste0("a_", fv, "[", fv, "]", collapse = " + "))
-    )
+
+    # y ~ k1 + k2 + ...
+    cat("WARNING: Specifying a model with no intercept but also specifying only factor variables is a contradiction. The intercept will be included and estimates will be aggregated at the end.\n")
+    m <- paste0("a0 + ", paste0("a_", fv, "[", fv, "[i]]", collapse = " + "))
+    return(m)
+
   } else if (!has_numeric && !has_factor && has_intercept) {
+
     # y ~ 1
     return("a0")
+
   } else if (has_numeric && has_factor && !has_intercept) {
-    # y ~ (b + k)*x
-    slope <- paste0(
+
+    # y ~ (bx1 + bx1_k1)*x1 + (bx2 + bx2_k1)*x2 + ...
+    # Builds inner slope (bx1 + bx1_k1 + ...) then the outer product
+    m <- paste0(
       sapply(seq_along(nv), function(i) {
-        inner <- paste0("b", nv[i], "_", fv, "[", fv, "]", collapse = " + ")
+        # creates: bxi_k1 + bxi_k2 + ...
+        inner <- paste0("b", nv[i], "_", fv, "[", fv, "[i]]", collapse = " + ")
+        # creates: bxi + bxi_k1 + bxi_k2 + ...
         inner <- paste0("b", nv[i], " + ", inner)
-        paste0("(", inner, ") * ", nv[i])
+        # creates: (bxi + bxi_k1 + bxi_k2 + ...)*xi
+        paste0("(", inner, ") * ", nv[i], "[i]")
       }),
       collapse = " + ")
-    return(slope)
+    return(m)
+
   } else if (has_numeric && !has_factor && has_intercept) {
-    # y ~ a + b*x
-    bxi <- paste0("b", nv)
-    bxi <- paste0(bxi, " * ", nv, collapse = " + ")
-    abxi <- paste0("a0", " + ", bxi)
-    return(abxi)
+
+    # y ~ a + b1*x1 + b2*x2 + ...
+    # creates: bx1, bx2, ...
+    m <- paste0("b", nv)
+    # creates: bx1*x1 + bx2*x2 + ...
+    m <- paste0(m, " * ", nv, "[i]", collapse = " + ")
+    m <- paste0("a0", " + ", m)
+    return(m)
+
   } else if (!has_numeric && has_factor && has_intercept) {
-    # y ~ a + k
-    return(
-      paste0("a0 + ",
-             paste0("a_", fv, "[", fv, "]", collapse = " + "))
-    )
+
+    # y ~ a + k1 + k2 + ...
+    m <- paste0("a0 + ", paste0("a_", fv, "[", fv, "[i]]", collapse = " + "))
+    return(m)
+
   } else {
-    # y ~ (a + k) + (b + k)*x
-    slope <- paste0(
+
+    # y ~ (a + k) + (bx1 + bx1_k1)*x1 + (bx2 + bx2_k1)*x2 + ...
+    m <- paste0(
       sapply(seq_along(nv), function(i) {
-        inner <- paste0("b", nv[i], "_", fv, "[", fv, "]", collapse = " + ")
+        inner <- paste0("b", nv[i], "_", fv, "[", fv, "[i]]", collapse = " + ")
         inner <- paste0("b", nv[i], " + ", inner)
-        paste0("(", inner, ") * ", nv[i])
+        paste0("(", inner, ") * ", nv[i], "[i]")
       }),
       collapse = " + ")
-    a0 <- paste0("a0 + ", paste0("a_", fv, "[", fv, "]", collapse = " + "))
-    return(paste0(a0, " + ", slope))
+    a0 <- paste0("a0 + ", paste0("a_", fv, "[", fv, "[i]]", collapse = " + "))
+    return(paste0(a0, " + ", m))
   }
+
 }

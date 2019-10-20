@@ -11,7 +11,7 @@
       factor_coefs <- c(
         factor_coefs,
         paste0("b", nv),
-        paste0("b", nv, "_", factor_vars, "[", factor_vars, "]")
+        paste0("b", nv, "_", factor_vars)
       )
     }
   }
@@ -23,7 +23,7 @@
     } else {
       intercepts <- c(intercepts,
                       "a0",
-                      paste0("a_", factor_vars, "[", factor_vars, "]"))
+                      paste0("a_", factor_vars))
     }
   }
 

@@ -40,6 +40,9 @@ dc_mxmk <- list(numeric_vars =c("x1", "x2"), factor_vars =c("k1", "k2", "k3"))
 .buildLinearModel(dc_mxmk, 0)
 .buildLinearModel(dc_mxmk, 1)
 
+dc_big <- list(numeric_vars =paste0("x", 1:5), factor_vars =paste0("k", 1:10))
+.buildLinearModel(dc_big, 0)
+.buildLinearModel(dc_big, 1)
 
 #########################
 

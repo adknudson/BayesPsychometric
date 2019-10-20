@@ -20,19 +20,4 @@ dat_binom <- data.frame(y = y2, k = size, prop = y2 / size, x1 = x1, x2 = x2,
 ###################
 devtools::load_all()
 
-link <- "logit"
-
-f <- y ~ x1 + x2 + age
-(fls <- .extractFromFormula(f))
-if (grepl(pattern = "\\|", fls[["LHS"]])) {
-  fls[["data_mode"]] <- "binomial"
-  fls[["LHS"]] <- trimws(strsplit(fls[["LHS"]], split = "\\|")[[1]])
-} else {
-  fls[["data_mode"]] <- "bernoulli"
-}
-(dc <- .getDataClasses(fls, dat_bern))
-.getModelTerms(fls, dc)
-.buildLinkFormula(fls, dc, link)
-.buildDistributionFormula(fls, link)
-
-f2stan(y|k ~ x1 + age + gender, dat_binom, "logit")
+f2stan(y ~ x1 + x2 + age + gender, dat_bern, "probit")

@@ -42,12 +42,6 @@ f2stan <- function(formula, data, link) {
 
   # Extract features from formula --------------------------------------------
   fls <- .extractFromFormula(formula)
-  if (grepl(pattern = "\\|", fls[["LHS"]])) {
-    fls[["data_mode"]] <- "binomial"
-    fls[["LHS"]] <- trimws(strsplit(fls[["LHS"]], split = "\\|")[[1]])
-  } else {
-    fls[["data_mode"]] <- "bernoulli"
-  }
 
   # Get the class of each column in the model --------------------------------
   data_classes <- .getDataClasses(fls, data)
@@ -55,17 +49,22 @@ f2stan <- function(formula, data, link) {
   # Intermediate checks ------------------------------------------------------
 
 
-  # Build up the formula list ------------------------------------------------
+  # Build up the model pieces ------------------------------------------------
   m_dist  <- .buildDistributionFormula(fls, link)
   m_link  <- .buildLinkFormula(fls, data_classes, link)
   m_terms <- .getModelTerms(fls, data_classes)
   m_prior <- .buildPriorFormula(m_terms)
 
-  # Convert the strings to calls for rethinking::map2stan --------------------
   model <- list(mode = m_dist,
                 linear_model = m_link,
                 priors = m_prior)
 
+  # Process the data ---------------------------------------------------------
+  data <- .processData(data, fls, data_classes)
+
+  # Build the Stan code
+
   # Return the model ---------------------------------------------------------
-  model
+  # model
+  list(model = model, fls = fls, data_classes = data_classes, data = data)
 }

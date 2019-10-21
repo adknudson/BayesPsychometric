@@ -23,7 +23,7 @@
   } else if (!has_numeric && has_factor && !has_intercept) {
 
     # y ~ k1 + k2 + ...
-    cat("WARNING: Specifying a model with no intercept but also specifying only factor variables is a contradiction. The intercept will be included and estimates will be aggregated at the end.\n")
+    warning("Specifying a model with no intercept but also specifying only factor variables is a contradiction. The intercept will be included and estimates will be aggregated at the end.")
     m <- paste0("a0 + ", paste0("a_", fv, "[", fv, "[i]]", collapse = " + "))
     return(m)
 

@@ -30,8 +30,6 @@ When using this package, one must be preemptive and make sure that the data is p
 
 **Warning** *This package makes assumptions about the abstracted model based on the type of data in the formula.*
 
-I would also like to now mention [Richard McElreath](https://xcelab.net/rm/) who is the main inspiration for this package and whose book *Statistical Rethinking* has been most influential. His `R` package, `rethinking` is the basis on which this one is derived. In fact, this package is simply a wrapper for `rethinking`, and provides a simple syntax for specifying a logistic formula and outputting a formula list that `rethinking::map2stan()` can use.
-
 If you need more flexibility in specifying a hierarchical model, I recommend `rethinking` first before moving on to `rstan` which is the basis for his package.
 
 ### Data
@@ -122,20 +120,13 @@ There are two ways to use `bayesPF`. The first is with binary data as with the `
 **Binary model with no factors**
 
 ```{r}
-# Currently rstan and rethinking need to be loaded for bayesPF to work
-library(rstan)
-library(rethinking)
 m1.1 <- bayesPF(y ~ x1 + x2, data = dat_bern, link = "logit")
-
-# function from the rethinking package for model summary
-precis(m1.1)
 ```
 
 **Binary model with factors**
 
 ```{r}
 m1.2 <- bayesPF(y ~ x1 + x2 + gender + age, data = dat_bern, link = "logit")
-precis(m1.2, depth = 2) 
 ```
 
 **Binomial model with no factors**
@@ -146,12 +137,10 @@ $$y_{|k} \sim x$$
 
 ```{r}
 m2.1 <- bayesPF(y|k ~ x1 + x2, data = dat_binom, link = "logit")
-precis(m2.1) 
 ```
 
 **Binary model with factors**
 
 ```{r}
 m2.2 <- bayesPF(y|k ~ x1 + x2 + gender + age, data = dat_binom, link = "logit")
-precis(m2.2, depth = 2) 
 ```

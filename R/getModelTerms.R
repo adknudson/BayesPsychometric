@@ -27,6 +27,6 @@
     }
   }
 
-  list(factor_coefs=factor_coefs,
-       intercepts=intercepts)
+  list(factor_coefs = factor_coefs,
+       intercepts = intercepts)
 }

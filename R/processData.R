@@ -1,4 +1,8 @@
 .processData <- function(data, fls, data_classes) {
+
+  assertthat::assert_that(!("N" %in% names(data)),
+                          msg = "'N' is a reserved variable name in bayesPF. Please rename this column to something else.")
+
   # Data needs to be a list
   data <- as.list(as.data.frame(data))
   # Get total number of observations

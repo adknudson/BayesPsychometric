@@ -43,8 +43,8 @@ bayesPF <- function(formula, data, link,
   data <- fstan[["data"]]
   data_classes <- fstan[["data_classes"]]
   fls <- fstan[["fls"]]
-  # Prepare arguments for Stan -----------------------------------------------
 
+  # Prepare arguments for Stan -----------------------------------------------
   # Number of cores -------------------
   if (cores < 0) {
     cores <- 1

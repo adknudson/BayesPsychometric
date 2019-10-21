@@ -14,6 +14,13 @@
     data_mode <- "bernoulli"
   }
 
+  # Assertions
+  assertthat::assert_that(length(LHS) %in% c(1,2),
+                          msg = paste("The number of arguments on the left hand side of the equation must be 1 (for bernoulli data) or 2 (for binomial data). The number of args on the LHS is", length(LHS)))
+  assertthat::assert_that(all(attr(fterm, "order") == 1),
+                          msg = "The order of all variables must be 1 (linear).")
+  # Pray that the user doesn't specify an invalid equation
+
   list(vars = fvars,
        LHS = LHS,
        RHS = RHS,

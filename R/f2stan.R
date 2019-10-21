@@ -8,18 +8,18 @@
 f2stan <- function(formula, data, link) {
 
   # Preliminary checks -------------------------------------------------------
-  stopifnot(
-    link %in% c("logit", "probit")
-  )
+  assertthat::assert_that(link %in% c("logit", "probit"),
+                          msg = "'Link' function must be either 'logit' or 'probit'.")
 
   # Extract features from formula --------------------------------------------
   fls <- .extractFromFormula(formula)
 
+  # Pre-process the data -----------------------------------------------------
+  # Standardize the numeric variables
+  data <- .preProcessData(data, fls)
+
   # Get the class of each column in the model --------------------------------
   data_classes <- .getDataClasses(fls, data)
-
-  # Intermediate checks ------------------------------------------------------
-
 
   # Build up the model pieces ------------------------------------------------
   m_dist  <- .buildDistributionFormula(fls, link)

@@ -3,3 +3,5 @@
 .RData
 .Ruserdata
 inst/doc
+github_auth.R
+github_auth_token.RData

@@ -9,8 +9,8 @@ License: GPLv3
 Encoding: UTF-8
 LazyData: true
 Imports:
-    rstan,
-    assertthat
+    assertthat,
+    rstan
 RoxygenNote: 6.1.1
 Suggests: 
     knitr,

@@ -31,8 +31,6 @@ bayesPF <- function(formula, data, link,
                     chains = 1, iter = 2000, warmup = 1000, thin = 1,
                     sample = TRUE, cores = 1, ...) {
 
-  require(rstan)
-
   concat <- function(...) {
     paste(..., collapse = "", sep = "")
   }
@@ -50,7 +48,7 @@ bayesPF <- function(formula, data, link,
     cores <- 1
   }
   options(mc.cores = min(as.integer(cores), parallel::detectCores()))
-  rstan::rstan_options(auto_write = TRUE)
+  rstan_options(auto_write = TRUE)
 
   # Parameter inits -------------------
   inits <- list()
@@ -86,7 +84,7 @@ bayesPF <- function(formula, data, link,
   }
 
   # Sending all arguments to stan --------------------------------------------
-  rstan::stan(
+  stan(
     model_name = "BayesPF",
     model_code = model_code,
     data       = data,

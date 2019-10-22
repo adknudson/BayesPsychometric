@@ -16,7 +16,7 @@ f2stan <- function(formula, data, link) {
 
   # Pre-process the data -----------------------------------------------------
   # Standardize the numeric variables
-  data <- .preProcessData(data, fls)
+  data <- .preProcessData(fls, data)
 
   # Get the class of each column in the model --------------------------------
   data_classes <- .getDataClasses(fls, data)

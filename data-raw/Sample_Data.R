@@ -1,23 +1,35 @@
 ## code to prepare `Sample_Data` dataset goes here
 set.seed(101)
 n <- 300
-x1 <- runif(n, -1, 1)
-a <- 0.6
-b1 <- -3.2
+x1 <- runif(n, -100, 100)
+a <- 1.4
+b1 <- 0.07
 
 gender <- factor(sample(c("male", "female"), n, TRUE))
-a_gender <- list(male = -0.02, female = 0.03)
-b_gender <- list(male = -0.8, female = 0.6)
+a_gender <- list(male = -2, female = 0.7)
+b_gender <- list(male = -0.02, female = 0.03)
 agender <- unlist(a_gender[gender])
 bgender <- unlist(b_gender[gender])
 
 age <- factor(sample(c("<25", "25-50", ">50"), n, TRUE),
               levels = c("<25", "25-50", ">50"), ordered = TRUE)
-a_age <- list("<25" = -0.4, "25-50" = 0, ">50" = 0.8)
-b_age <- list("<25" = -0.12, "25-50" = 0.56, ">50" = 0.73)
+a_age <- list("<25" = -1, "25-50" = 0, ">50" = 1)
+b_age <- list("<25" = -0.012, "25-50" = 0.0056, ">50" = 0.073)
 aage <- unlist(a_age[age])
 bage <- unlist(b_age[age])
 
+# Alpha
+#          Male  Female
+# <25      -1.6     1.1
+# 25-50    -0.6     2.1
+# >50       0.4     3.1
+#
+# Beta
+#          Male    Female
+# <25    0.038     0.088
+# 25-50  0.0556    0.1056
+# >50    0.123     0.173
+#
 
 p <- 1 / (1 + exp(-(a + agender + aage + (b1 + bgender + bage)*x1)))
 y <- rbinom(n, size = 1, prob = p)

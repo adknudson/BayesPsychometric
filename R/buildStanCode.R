@@ -103,7 +103,7 @@
   body_model <- concat(
     body_model,
     indent, "vector[N] theta;\n",
-    indent, "real default_sd = inv_sqrt(0.001);  // ~32\n\n",
+    indent, "real default_sd = inv_sqrt(0.01);  // =10\n\n",
     indent, "// Priors\n",
     concat(indent, model[["priors"]], ";\n"), "\n",
     indent, "// General linear model\n",

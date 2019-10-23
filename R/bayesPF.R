@@ -84,7 +84,7 @@ bayesPF <- function(formula, data, link,
   }
 
   # Sending all arguments to stan --------------------------------------------
-  stan(
+  fit <- stan(
     model_name = "BayesPF",
     model_code = model_code,
     data       = data,
@@ -93,4 +93,11 @@ bayesPF <- function(formula, data, link,
     warmup     = warmup,
     chains     = chains,
     thin       = thin, ...)
+
+  # Extract and process samples ----------------------------------------------
+  samples <- extract(fit)
+  samples <- .processSamples(samples, data,
+                             data_classes, fls[["include_intercept"]])
+
+  list(fit = fit, samples = samples)
 }

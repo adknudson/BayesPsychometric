@@ -29,11 +29,16 @@
 #' hist(fit.samples$bx2, breaks = 50)
 bayesPF <- function(formula, data, link,
                     chains = 1, iter = 2000, warmup = 1000, thin = 1,
-                    sample = TRUE, cores = 1, ...) {
+                    cores = 1, sample = TRUE, return_stan_fit = FALSE,
+                    return_f2stan = FALSE,
+                    ...) {
 
   concat <- function(...) {
     paste(..., collapse = "", sep = "")
   }
+
+  # Initialize an empty return list
+  ret_list <- list()
 
   # Build the model from the formula -----------------------------------------
   fstan <- f2stan(formula, data, link)
@@ -41,12 +46,13 @@ bayesPF <- function(formula, data, link,
   data <- fstan[["data"]]
   data_classes <- fstan[["data_classes"]]
   fls <- fstan[["fls"]]
+  if (return_f2stan) {
+    ret_list[["f2stan"]] <- fls
+  }
 
   # Prepare arguments for Stan -----------------------------------------------
   # Number of cores -------------------
-  if (cores < 0) {
-    cores <- 1
-  }
+  if (cores < 0) cores <- 1
   options(mc.cores = min(as.integer(cores), parallel::detectCores()))
   rstan_options(auto_write = TRUE)
 
@@ -84,20 +90,26 @@ bayesPF <- function(formula, data, link,
   }
 
   # Sending all arguments to stan --------------------------------------------
-  fit <- stan(
-    model_name = "BayesPF",
-    model_code = model_code,
-    data       = data,
-    init       = inits,
-    iter       = iter,
-    warmup     = warmup,
-    chains     = chains,
-    thin       = thin, ...)
+  if (sample) {
+    fit <- stan(
+      model_name = "BayesPF",
+      model_code = model_code,
+      data       = data,
+      init       = inits,
+      iter       = iter,
+      warmup     = warmup,
+      chains     = chains,
+      thin       = thin, ...)
 
-  # Extract and process samples ----------------------------------------------
-  samples <- extract(fit)
-  samples <- .processSamples(samples, data,
-                             data_classes, fls[["include_intercept"]])
+    # Extract and process samples ----------------------------------------------
+    samples <- extract(fit)
+    samples <- .processSamples(samples, data,
+                               data_classes, fls[["include_intercept"]])
+    ret_list[["samples"]] <- samples
 
-  list(fit = fit, samples = samples)
+    if (return_stan_fit) ret_list[["fit"]] <- fit
+  }
+
+  # Return the results
+  ret_list
 }

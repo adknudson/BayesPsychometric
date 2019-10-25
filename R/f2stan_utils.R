@@ -52,34 +52,38 @@
 # Which variables are numeric? factor? character? predictor? response? etc.
 .getDataClasses <- function(fls, data) {
 
+  vars <- fls[["vars"]]
+  LHS <- fls[["LHS"]]
+
   # Get the class of each column ---------------------------------------------
   # Ordered factors have two classes (ordered, factor) so get just the first
-  data_classes <- unlist(lapply(data, function(col) class(col)[1]))
-  data_names <- names(data)
+  metadata <- unlist(lapply(data, function(col) class(col)[1]))
+  # data_names <- names(data)
 
   # Split up the classes by part of formula ----------------------------------
-  response <- data_classes[fls[["LHS"]]]
-  predictors <- data_classes[fls[["vars"]]]
+  response_vars <- LHS
+  response_class <- metadata[response_vars]
 
-  factor_vars <- subset(fls[["vars"]],
-                        data_classes[fls[["vars"]]] %in% c("factor", "ordered"))
-  numeric_vars <- subset(fls[["vars"]],
-                         data_classes[fls[["vars"]]] %in% c("numeric", "integer"))
-  character_vars <- subset(fls[["vars"]],
-                           data_classes[fls[["vars"]]] == "character")
+  numeric_vars <- subset(vars, metadata[vars] %in% c("numeric", "integer"))
+  numeric_class <- metadata[numeric_vars]
+
+  factor_vars <- subset(vars, metadata[vars] %in% c("factor", "ordered"))
+  factor_class <- metadata[factor_vars]
+
+  character_vars <- subset(vars, metadata[vars] == "character")
 
   # Assertions ---------------------------------------------------------------
-  assertthat::assert_that(assertthat::has_name(data, c(fls[["LHS"]], fls[["vars"]])),
+  assertthat::assert_that(assertthat::has_name(data, c(LHS, vars)),
                           msg = "One or more of the variables in the formula is not a variable in the data.")
-  assertthat::assert_that(all(response == "integer"),
+  assertthat::assert_that(all(response_class == "integer"),
                           msg = paste("The response variable(s) must be integers.", paste(names(response), "is type", response, collapse = "; ")))
-  assertthat::assert_that(all(data[fls[["LHS"]]] >= 0),
+  assertthat::assert_that(all(data[response_vars] >= 0),
                           msg = "The response variables must all be non-negative integers.")
-  assertthat::assert_that(!("character" %in% predictors),
+  assertthat::assert_that(!("character" %in% c(numeric_class, factor_class)),
                           msg = "The predictor variables must not be of type 'character'. Please make sure that they are either of type 'integer', 'numeric', or 'factor'.")
   if (fls[["data_mode"]] == "binomial") {
-    successes <- data[[fls[["LHS"]][1]]]
-    size <- data[[fls[["LHS"]][2]]]
+    successes <- data[[response_vars[1]]]
+    size <- data[[response_vars[2]]]
     assertthat::assert_that(all(successes <= size),
                             msg = "In a binomial distribution, the number of successes must be less than or equal to the size of the draw. Please validate your response variables.")
   }
@@ -95,11 +99,14 @@
     }
   }
 
-  list(response = response,
-       predictors = predictors,
-       numeric_vars = numeric_vars,
-       factor_vars = factor_vars,
-       character_vars = character_vars)
+  list(
+    vars = list(response = response_vars,
+                numeric = numeric_vars,
+                factor = factor_vars),
+    class = list(response = response_class,
+                 numeric = numeric_class,
+                 factor = factor_class)
+  )
 }
 
 
@@ -108,14 +115,16 @@
 # scale with the estimated coefficients.
 .preProcessData <- function(fls, data) {
 
-  # We call data_classes in here because standardizing will change integer
-  # predictors to numeric, and we want that change to be reflected later on
-  data_classes <- .getDataClasses(fls, data)
   has_intercept <- fls[["include_intercept"]]
 
+  # We call metadata in here because standardizing will change integer
+  # predictors to numeric, and we want that change to be reflected later on
+  metadata <- .getDataClasses(fls, data)
+  nvs <- metadata[["vars"]][["numeric"]]
+
   # if there are numeric variables, standardize them
-  if (length(data_classes[["numeric_vars"]]) > 0) {
-    for (nv in data_classes[["numeric_vars"]]) {
+  if (length(nvs) > 0) {
+    for (nv in nvs) {
       # Drop needs to be used to return a vector while keeping the attributes
       if (has_intercept) {
         data[[nv]] <- drop(scale(data[[nv]]))
@@ -136,7 +145,7 @@
 .buildDistributionFormula <- function(fls, link) {
 
   data_mode <- fls[["data_mode"]]
-  LHS <- fls[["LHS"]]
+  LHS       <- fls[["LHS"]]
 
   assertthat::assert_that(link %in% c("logit", "probit"),
                           msg = "'Link' function must be either 'logit' or 'probit'.")
@@ -178,13 +187,13 @@
 #============================================================================= .buildLinearModel
 # There are 8 cases a user can specify based on if a model has numeric
 # variables, factor variables, and an intercept.
-.buildLinearModel <- function(data_classes, has_intercept) {
+.buildLinearModel <- function(metadata, has_intercept) {
 
-  nv <- data_classes[["numeric_vars"]]
-  fv <- data_classes[["factor_vars"]]
+  nvs <- metadata[["vars"]][["numeric"]]
+  fvs <- metadata[["vars"]][["factor"]]
 
-  has_numeric <- length(nv) > 0
-  has_factor <- length(fv) > 0
+  has_numeric <- length(nvs) > 0
+  has_factor <- length(fvs) > 0
 
   if (!has_numeric && !has_factor && !has_intercept) {
 
@@ -195,16 +204,16 @@
 
     # y ~ b1*x1 + b2*x2 + ...
     # creates: bx1, bx2, ...
-    m <- paste0("b", nv)
+    m <- paste0("b", nvs)
     # creates: bx1*x1 + bx2*x2 + ...
-    m <- paste0(m, " * ", nv, "[i]", collapse = " + ")
+    m <- paste0(m, " * ", nvs, "[i]", collapse = " + ")
     return(m)
 
   } else if (!has_numeric && has_factor && !has_intercept) {
 
     # y ~ k1 + k2 + ...
     warning("Specifying a model with no intercept but also specifying only factor variables is a contradiction. The intercept will be included and estimates will be aggregated at the end.")
-    m <- paste0("a0 + ", paste0("a_", fv, "[", fv, "[i]]", collapse = " + "))
+    m <- paste0("a0 + ", paste0("a_", fvs, "[", fvs, "[i]]", collapse = " + "))
     return(m)
 
   } else if (!has_numeric && !has_factor && has_intercept) {
@@ -217,13 +226,13 @@
     # y ~ (bx1 + bx1_k1)*x1 + (bx2 + bx2_k1)*x2 + ...
     # Builds inner slope (bx1 + bx1_k1 + ...) then the outer product
     m <- paste0(
-      sapply(seq_along(nv), function(i) {
+      sapply(seq_along(nvs), function(i) {
         # creates: bxi_k1 + bxi_k2 + ...
-        inner <- paste0("b", nv[i], "_", fv, "[", fv, "[i]]", collapse = " + ")
+        inner <- paste0("b", nvs[i], "_", fvs, "[", fvs, "[i]]", collapse = " + ")
         # creates: bxi + bxi_k1 + bxi_k2 + ...
-        inner <- paste0("b", nv[i], " + ", inner)
+        inner <- paste0("b", nvs[i], " + ", inner)
         # creates: (bxi + bxi_k1 + bxi_k2 + ...)*xi
-        paste0("(", inner, ") * ", nv[i], "[i]")
+        paste0("(", inner, ") * ", nvs[i], "[i]")
       }),
       collapse = " + ")
     return(m)
@@ -232,29 +241,29 @@
 
     # y ~ a + b1*x1 + b2*x2 + ...
     # creates: bx1, bx2, ...
-    m <- paste0("b", nv)
+    m <- paste0("b", nvs)
     # creates: bx1*x1 + bx2*x2 + ...
-    m <- paste0(m, " * ", nv, "[i]", collapse = " + ")
+    m <- paste0(m, " * ", nvs, "[i]", collapse = " + ")
     m <- paste0("a0", " + ", m)
     return(m)
 
   } else if (!has_numeric && has_factor && has_intercept) {
 
     # y ~ a + k1 + k2 + ...
-    m <- paste0("a0 + ", paste0("a_", fv, "[", fv, "[i]]", collapse = " + "))
+    m <- paste0("a0 + ", paste0("a_", fvs, "[", fvs, "[i]]", collapse = " + "))
     return(m)
 
   } else {
 
     # y ~ (a + k) + (bx1 + bx1_k1)*x1 + (bx2 + bx2_k1)*x2 + ...
     m <- paste0(
-      sapply(seq_along(nv), function(i) {
-        inner <- paste0("b", nv[i], "_", fv, "[", fv, "[i]]", collapse = " + ")
-        inner <- paste0("b", nv[i], " + ", inner)
-        paste0("(", inner, ") * ", nv[i], "[i]")
+      sapply(seq_along(nvs), function(i) {
+        inner <- paste0("b", nvs[i], "_", fvs, "[", fvs, "[i]]", collapse = " + ")
+        inner <- paste0("b", nvs[i], " + ", inner)
+        paste0("(", inner, ") * ", nvs[i], "[i]")
       }),
       collapse = " + ")
-    a0 <- paste0("a0 + ", paste0("a_", fv, "[", fv, "[i]]", collapse = " + "))
+    a0 <- paste0("a0 + ", paste0("a_", fvs, "[", fvs, "[i]]", collapse = " + "))
     return(paste0(a0, " + ", m))
   }
 
@@ -264,17 +273,14 @@
 #============================================================================= .buildLinkFormula
 # Bernoulli and Binomial logit have their own functions. Pribt models need to
 # apply the Normal Inverse CDF (Phi) to the linear model
-.buildLinkFormula <- function(fls, data_classes, link) {
+.buildLinkFormula <- function(metadata, link, has_intercept) {
 
   # Assertions ---------------------------------------------------------------
   assertthat::assert_that(link %in% c("logit", "probit"),
                           msg = "'Link' function must be either 'logit' or 'probit'.")
 
-  factor_vars <- data_classes[["factor_vars"]]
-  numeric_vars <- data_classes[["numeric_vars"]]
-
   m_prob <- "theta[i]"
-  m_lm <- .buildLinearModel(data_classes, fls[["include_intercept"]])
+  m_lm <- .buildLinearModel(metadata, has_intercept)
 
   # Probit link uses the inverse CDF of the normal distribution, Phi
   if (link == "probit") {
@@ -287,32 +293,32 @@
 
 #============================================================================= .getModelTerms
 # TODO: Rewrtie this so that it's more in line with .buildLinearModel()
-.getModelTerms <- function(fls, data_classes){
+.getModelTerms <- function(metadata, has_intercept){
 
-  factor_vars <- data_classes[["factor_vars"]]
-  numeric_vars <- data_classes[["numeric_vars"]]
+  nvs <- metadata[["vars"]][["numeric"]]
+  fvs <- metadata[["vars"]][["factor"]]
 
   factor_coefs <- NULL
-  for (nv in numeric_vars) {
-    if (length(factor_vars) == 0) {
+  for (nv in nvs) {
+    if (length(fvs) == 0) {
       factor_coefs <- c(factor_coefs, paste0("b", nv))
     } else {
       factor_coefs <- c(
         factor_coefs,
         paste0("b", nv),
-        paste0("b", nv, "_", factor_vars)
+        paste0("b", nv, "_", fvs)
       )
     }
   }
 
   intercepts <- NULL
-  if (fls[["include_intercept"]]) {
-    if (length(factor_vars) == 0) {
+  if (has_intercept) {
+    if (length(fvs) == 0) {
       intercepts <- c(intercepts, "a0")
     } else {
       intercepts <- c(intercepts,
                       "a0",
-                      paste0("a_", factor_vars))
+                      paste0("a_", fvs))
     }
   }
 
@@ -334,25 +340,31 @@
 
 #============================================================================= .processData
 # Change factor variables to integer values. Convert data frame to list
-.processData <- function(data, fls, data_classes) {
+.processData <- function(data, metadata) {
 
   assertthat::assert_that(!("N" %in% names(data)),
                           msg = "'N' is a reserved variable name in bayesPF. Please rename this column to something else.")
 
-  # Data needs to be a list
+  fvs <- metadata[["vars"]][["factor"]]
+
+  # Get the number of observations
+  N <- nrow(data)
+
+  # Data needs to be a list for rstan::stan
   data <- as.list(as.data.frame(data))
-  # Get total number of observations
-  data[["N"]] <- length(data[[fls[["LHS"]][1]]])
+
+  # Save total number of observations
+  data[["N"]] <- N
+
   # Convert factors to integers if any factors are specified
-  if (length(data_classes[["factor_vars"]]) > 0) {
-    data[data_classes[["factor_vars"]]] <- lapply(
-      data[data_classes[["factor_vars"]]],
-      as.integer)
+  if (length(fvs) > 0) {
+    data[fvs] <- lapply(data[fvs], as.integer)
     # Get the number of levels of each factor
-    for (fv in data_classes[["factor_vars"]]) {
+    for (fv in fvs) {
       data[[paste0("N_", fv)]] <- length(unique(data[[fv]]))
     }
   }
+
   data
 }
 
@@ -360,7 +372,15 @@
 #============================================================================= .buildStanCode
 # Workhorse function
 # Creates the Stan code in 3 parts: Data, Parameters, and Model
-.buildStanCode <- function(data, model, fls, data_classes) {
+.buildStanCode <- function(data, model, fls, metadata) {
+
+  nvs <- metadata[["vars"]][["numeric"]]
+  fvs <- metadata[["vars"]][["factor"]]
+  nvs_class <- metadata[["class"]][["numeric"]]
+
+  LHS <- fls[["LHS"]]
+  has_intercept <- fls[["include_intercept"]]
+  data_mode <- fls[["data_mode"]]
 
   concat <- function(...) {
     paste(..., collapse = "", sep = "")
@@ -383,8 +403,8 @@
   )
 
   # Declare number of factor levels if any factors are in the model
-  if (length(data_classes[["factor_vars"]]) > 0) {
-    for (fv in data_classes[["factor_vars"]]) {
+  if (length(fvs) > 0) {
+    for (fv in fvs) {
       body_data <- concat(
         body_data,
         indent, "int<lower=1> N_", fv, ";\n"
@@ -394,23 +414,23 @@
 
   # Response data (bernoulli or binomial)
   body_data <- concat(body_data, "\n", indent, "// Response Data\n")
-  if (fls[["data_mode"]] == "bernoulli") {
-    body_data <- concat(body_data, indent, "int ", fls[["LHS"]], "[N];\n")
-  } else if (fls[["data_mode"]] == "binomial") {
-    body_data <- concat(body_data, indent, "int ", fls[["LHS"]][1], "[N];\n")
-    body_data <- concat(body_data, indent, "int ", fls[["LHS"]][2], "[N];\n")
+  if (data_mode == "bernoulli") {
+    body_data <- concat(body_data, indent, "int ", LHS, "[N];\n")
+  } else if (data_mode == "binomial") {
+    body_data <- concat(body_data, indent, "int ", LHS[1], "[N];\n")
+    body_data <- concat(body_data, indent, "int ", LHS[2], "[N];\n")
   } else {
     stop("Data responses must be bernoulli or binomial")
   }
 
   # Numeric variables
-  if (length(data_classes[["numeric_vars"]]) > 0) {
+  if (length(nvs) > 0) {
     body_data <- concat(body_data, "\n", indent, "// Numeric Data\n")
-    for(nv in data_classes[["numeric_vars"]]) {
+    for(nv in nvs) {
       # Get the specific type of the numeric variable (numeric or integer)
-      if (data_classes[["predictors"]][nv] == "integer") {
+      if (nvs_class[nv] == "integer") {
         nv_type <- "int"
-      } else if (data_classes[["predictors"]][nv] == "numeric") {
+      } else if (nvs_class[nv] == "numeric") {
         nv_type <- "real"
       } else {
         stop("Predictor variable must be of type 'numeric' or 'integer'.")
@@ -420,9 +440,9 @@
   }
 
   # Factor variables
-  if (length(data_classes[["factor_vars"]]) > 0) {
+  if (length(fvs) > 0) {
     body_data <- concat(body_data, "\n", indent, "// Factor Data\n")
-    for(fv in data_classes[["factor_vars"]]) {
+    for(fv in fvs) {
       body_data <- concat(body_data, indent, "int ", fv, "[N];\n")
     }
   }
@@ -430,12 +450,12 @@
   # Build parameters block ---------------------------------------------------
 
   # Intercept terms
-  if (fls[["include_intercept"]]) {
+  if (has_intercept) {
     body_parameters <- concat(body_parameters, indent, "// Intercept terms\n")
     body_parameters <- concat(body_parameters, indent, "real a0;\n")
     # Add vectors for factors if any are in the model
-    if (length(data_classes[["factor_vars"]]) > 0) {
-      for (fv in data_classes[["factor_vars"]]) {
+    if (length(fvs) > 0) {
+      for (fv in fvs) {
         body_parameters <- concat(
           body_parameters,
           indent, "vector[N_", fv, "] a_", fv, ";\n"
@@ -445,19 +465,19 @@
   } # if has intercept
 
   # Slope terms
-  if (length(data_classes[["numeric_vars"]]) > 0) {
+  if (length(nvs) > 0) {
     body_parameters <- concat(
       body_parameters, "\n",
       indent, "// Slope terms\n"
     )
-    for (nv in data_classes[["numeric_vars"]]) {
+    for (nv in nvs) {
       body_parameters <- concat(
         body_parameters,
         indent, "real b", nv, ";\n"
       )
       # Factor slope terms
-      if (length(data_classes[["factor_vars"]]) > 0) {
-        for (fv in data_classes[["factor_vars"]]) {
+      if (length(fvs) > 0) {
+        for (fv in fvs) {
           body_parameters <- concat(
             body_parameters,
             indent, "vector[N_", fv, "] b", nv, "_", fv, ";\n"

@@ -33,8 +33,7 @@ bayesPF <- function(formula, data, link,
                     chains = 1, iter = 2000, warmup = 1000, thin = 1,
                     cores = 1, ...,
                     sample = TRUE,
-                    return_stan_fit = FALSE,
-                    return_f2stan = FALSE) {
+                    return_stan_fit = FALSE) {
 
   concat <- function(...) {
     paste(..., collapse = "", sep = "")
@@ -46,6 +45,7 @@ bayesPF <- function(formula, data, link,
   # Build the model from the formula -----------------------------------------
   # NOTE: this function modifies the data so it's important to reassign `data`
   fstan <- f2stan(formula, data, link)
+  ret_list[["f2stan"]] <- fstan
 
   # Extract objects from fstan
   model_code <- fstan[["StanCode"]]
@@ -108,15 +108,13 @@ bayesPF <- function(formula, data, link,
       thin       = thin, ...)
 
     # Extract and process samples ----------------------------------------------
-    samples <- extract(fit)
-    samples <- .processSamples(samples, data,
-                               metadata, has_intercept)
+    samples <- rstan::extract(fit)
+    samples <- .processSamples(samples, data, metadata, has_intercept)
     ret_list[["samples"]] <- samples
 
     if (return_stan_fit) ret_list[["fit"]] <- fit
   }
 
   # Return the results
-  if (return_f2stan) ret_list[["f2stan"]] <- fstan
   ret_list
 }

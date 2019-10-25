@@ -5,8 +5,7 @@
 \title{Fits a psychometric function}
 \usage{
 bayesPF(formula, data, link, chains = 1, iter = 2000, warmup = 1000,
-  thin = 1, cores = 1, ..., sample = TRUE, return_stan_fit = FALSE,
-  return_f2stan = FALSE)
+  thin = 1, cores = 1, ..., sample = TRUE, return_stan_fit = FALSE)
 }
 \arguments{
 \item{formula}{A formula that one would pass to `glm` or similar}
@@ -15,7 +14,7 @@ bayesPF(formula, data, link, chains = 1, iter = 2000, warmup = 1000,
 
 \item{link}{A link function (either "logit" or "probit")}
 
-\item{...}{Other parameters to be passed to `rstan::stan()`. @seealso [stan()]}
+\item{...}{Other parameters to be passed to `rstan::stan()`.}
 
 \item{sample}{Whether to sample from the model or just build the model
 without sampling}
@@ -31,7 +30,7 @@ Fits a psychometric function
 }
 \examples{
 # Load the data
-data_binomial <- Sample_Data_Binomial
+data_binomial  <- Sample_Data_Binomial
 data_bernoulli <- Sample_Data_Bernoulli
 
 # Fit a full model using binomial response data. By default, it will only

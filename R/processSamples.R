@@ -1,10 +1,10 @@
-.processSamples <- function(samples, data, data_classes, has_intercept) {
+.processSamples <- function(samples, data, metadata, has_intercept) {
 
-  nvs <- data_classes[["numeric_vars"]]
-  fvs <- data_classes[["factor_vars"]]
+  nvs <- metadata[["vars"]][["numeric"]]
+  fvs <- metadata[["vars"]][["factor"]]
 
   has_numeric <- length(nvs) > 0
-  has_factor <- length(fvs) > 0
+  has_factor  <- length(fvs) > 0
 
   if (!has_numeric && !has_factor && !has_intercept) {
 

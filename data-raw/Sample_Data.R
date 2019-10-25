@@ -5,18 +5,20 @@ x1 <- runif(n, -100, 100)
 a <- 1.4
 b1 <- 0.07
 
-gender <- factor(sample(c("male", "female"), n, TRUE))
+gender <- factor(sample(c("male", "female"), n, TRUE),
+                 levels = c("female", "male"))
+
 a_gender <- list(male = -2, female = 0.7)
 b_gender <- list(male = -0.02, female = 0.03)
-agender <- unlist(a_gender[gender])
-bgender <- unlist(b_gender[gender])
+agender <- unlist(a_gender[as.character(gender)])
+bgender <- unlist(b_gender[as.character(gender)])
 
 age <- factor(sample(c("<25", "25-50", ">50"), n, TRUE),
               levels = c("<25", "25-50", ">50"), ordered = TRUE)
 a_age <- list("<25" = -1, "25-50" = 0, ">50" = 1)
 b_age <- list("<25" = -0.012, "25-50" = 0.0056, ">50" = 0.073)
-aage <- unlist(a_age[age])
-bage <- unlist(b_age[age])
+aage <- unlist(a_age[as.character(age)])
+bage <- unlist(b_age[as.character(age)])
 
 # Alpha
 #          Male  Female

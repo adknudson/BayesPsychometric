@@ -8,11 +8,13 @@
 ##############################################################################
 
 #============================================================================= .extractFromFormula
-# Takes in a formula such as
-#
-#     y|k ~ x1 + x2 + factor1 + factor 2
-#
-# and extracts helpful information like terms, response, intercept, etc.
+#'
+#'
+#' Takes in a formula such as
+#'
+#'     y|k ~ x1 + x2 + factor1 + factor 2
+#'
+#' and extracts helpful information like terms, response, intercept, etc.
 .extractFromFormula <- function(formula) {
 
   fstr  <- as.character(formula)
@@ -358,6 +360,7 @@
 
   # Convert factors to integers if any factors are specified
   if (length(fvs) > 0) {
+    data[paste0("levels_", fvs)] <- lapply(data[fvs], levels)
     data[fvs] <- lapply(data[fvs], as.integer)
     # Get the number of levels of each factor
     for (fv in fvs) {

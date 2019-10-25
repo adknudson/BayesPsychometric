@@ -5,7 +5,7 @@
 #'
 #' @param fit An object returned from `bayesPF()`.
 #' @export
-#' @importFrom purrr map2
+#' @importFrom purrr map map2
 extractFactorSamples <- function(fit) {
 
   fstan   <- fit[["f2stan"]]

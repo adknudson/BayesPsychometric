@@ -1,2 +1,5 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
+^data-raw$
+github_auth.R
+github_auth_token.RData

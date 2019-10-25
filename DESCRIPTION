@@ -1,14 +1,16 @@
 Package: BayesPsychometric
 Type: Package
 Title: Fits Psychometric Functions Using Bayesian Methods
-Version: 0.2.1
+Version: 0.3
 Author: Alex Knudson
 Maintainer: Alex Knudson <aknudson@nevada.unr.edu>
-Description: NA
+Description: A package that is focused on fitting psychometric functions often found in the field of psychology. It provides functionality for estimating categorical effects as well as the point of subjective simultaneity/equality (PSS/PSE), just noticeable difference/intensity (JND/JNI), and multilevel effects.
 License: GPLv3
 Encoding: UTF-8
 LazyData: true
 Imports:
+    assertthat,
+    purrr,
     rstan
 RoxygenNote: 6.1.1
 Suggests: 

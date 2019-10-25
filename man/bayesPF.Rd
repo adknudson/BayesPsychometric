@@ -5,40 +5,46 @@
 \title{Fits a psychometric function}
 \usage{
 bayesPF(formula, data, link, chains = 1, iter = 2000, warmup = 1000,
-  thin = 1, sample = TRUE, cores = 1, ...)
+  thin = 1, cores = 1, ..., sample = TRUE, return_stan_fit = FALSE)
 }
 \arguments{
-\item{formula}{A formula that one would pass to `glm` or similar.}
+\item{formula}{A formula that one would pass to `glm` or similar}
 
 \item{data}{A data.frame or list}
 
-\item{link}{A link function such as "logit" or "probit".}
+\item{link}{A link function (either "logit" or "probit")}
+
+\item{...}{Other parameters to be passed to `rstan::stan()`.}
+
+\item{sample}{Whether to sample from the model or just build the model
+without sampling}
+
+\item{return_stan_fit}{Return the full model created by `rstan::stan()`.
+Useful for debugging or using other `rstan` functions.}
+
+\item{return_f2stan}{Return the data and parameters generated internally by
+`f2stan()`. Useful for debugging.}
 }
 \description{
 Fits a psychometric function
 }
 \examples{
-# Build an arbitrary data set
-n <- 300
-x1 <- runif(n, -1, 1)
-x2 <- sample((-n\%/\%2):(n\%/\%2), n, TRUE)
-a <- 0.6
-b1 <- -4.2
-b2 <- -0.005
-p <- 1 / (1 + exp(-(a + b1*x1 + b2*x2)))
-y <- rbinom(n, size = 1, prob = p)
-size <- sample(3:5, n, TRUE)
-y2 <- rbinom(n, size = size, prob = p)
-gender <- factor(sample(c("male", "female"), n, TRUE))
-age <- factor(sample(c("<25", "25-50", ">50"), n, TRUE),
-              levels = c("<25", "25-50", ">50"), ordered = TRUE)
-dat_bern <- data.frame(y = y, x1 = x1, x2 = x2,
-                       gender = gender, age = age)
-dat_binom <- data.frame(y = y2, k = size, prop = y2 / size, x1 = x1, x2 = x2,
-                        gender = gender, age = age)
+# Load the data
+data_binomial  <- Sample_Data_Binomial
+data_bernoulli <- Sample_Data_Bernoulli
 
-fit <- bayesPF(y|k ~ x1 + x2 + age, dat_binom, "logit",
-               chains = 2, cores = 2, iter = 8000, warmup = 2000)
-fit.samples <- extract(fit)
-hist(fit.samples$bx2, breaks = 50)
+# Fit a full model using binomial response data. By default, it will only
+# return the posterior samples for the coefficients
+fit1.1 <- bayesPF(y|k ~ x1 + age + gender, data_binomial, "logit",
+                  chains = 2, cores = 2, iter = 8000, warmup = 2000)
+
+str(fit1.1)
+
+# Fit a full model using binary response data. To get the fitted Stan
+# model, specify `return_stan_fit = TRUE`. To get diagnostic information
+# such as the Stan code and transformed data, specify `return_f2stan = TRUE`
+fit1.2 <- bayesPF(y ~ x1 + age + gender, data_bernoulli, "probit",
+                  return_f2stan = TRUE, return_stan_fit = TRUE)
+str(fit1.2)
+extract(fit1.2$fit)
 }

@@ -9,12 +9,13 @@ f2stan(formula, data, link)
 \arguments{
 \item{formula}{A formula that you would pass to `glm` or similar.}
 
-\item{data}{A list or data.frame.}
+\item{data}{A data frame of observations.}
 
 \item{link}{A link function such as "logit" or "probit"}
 }
 \value{
-A model that is passed to `rstan::stan`
+A model and data that can be used by `rstan::stan` as well as
+  information about the model and the data.
 }
 \description{
 Convert a typical formula to a formula list that map2stan can understand

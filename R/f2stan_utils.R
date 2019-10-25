@@ -34,10 +34,14 @@
   }
 
   # Assertions
-  assertthat::assert_that(length(LHS) %in% c(1,2),
-                          msg = paste("The number of arguments on the left hand side of the equation must be 1 (for bernoulli data) or 2 (for binomial data). The number of args on the LHS is", length(LHS)))
-  assertthat::assert_that(all(attr(fterm, "order") == 1),
-                          msg = "The order of all variables must be 1 (linear).")
+  assertthat::assert_that(
+    length(LHS) %in% c(1,2),
+    msg = paste("The number of arguments on the left hand side of the equation must be 1 (for bernoulli data) or 2 (for binomial data). The number of args on the LHS is", length(LHS))
+  )
+  assertthat::assert_that(
+    all(attr(fterm, "order") == 1),
+    msg = "The order of all variables must be 1 (linear)."
+  )
   # Maybe disallow users from specifying a model with no intercept?
   if (!fint) {
     warning("Specifying a model with no intercept implicitly constrains the y-intercept to be 0.5 (0 on the log-odds scale).")
@@ -55,8 +59,9 @@
 # Which variables are numeric? factor? character? predictor? response? etc.
 .getDataClasses <- function(fls, data) {
 
-  vars <- fls[["vars"]]
-  LHS <- fls[["LHS"]]
+  vars      <- fls[["vars"]]
+  LHS       <- fls[["LHS"]]
+  data_mode <- fls[["data_mode"]]
 
   # Get the class of each column ---------------------------------------------
   # Ordered factors have two classes (ordered, factor) so get just the first
@@ -76,19 +81,29 @@
   character_vars <- subset(vars, metadata[vars] == "character")
 
   # Assertions ---------------------------------------------------------------
-  assertthat::assert_that(assertthat::has_name(data, c(LHS, vars)),
-                          msg = "One or more of the variables in the formula is not a variable in the data.")
-  assertthat::assert_that(all(response_class == "integer"),
-                          msg = paste("The response variable(s) must be integers.", paste(names(response), "is type", response, collapse = "; ")))
-  assertthat::assert_that(all(data[response_vars] >= 0),
-                          msg = "The response variables must all be non-negative integers.")
-  assertthat::assert_that(!("character" %in% c(numeric_class, factor_class)),
-                          msg = "The predictor variables must not be of type 'character'. Please make sure that they are either of type 'integer', 'numeric', or 'factor'.")
-  if (fls[["data_mode"]] == "binomial") {
+  assertthat::assert_that(
+    assertthat::has_name(data, c(LHS, vars)),
+    msg = "One or more of the variables in the formula is not a variable in the data."
+  )
+  assertthat::assert_that(
+    all(response_class == "integer"),
+    msg = paste("The response variable(s) must be integers.", paste(names(response), "is type", response, collapse = "; "))
+  )
+  assertthat::assert_that(
+    all(data[response_vars] >= 0),
+    msg = "The response variables must all be non-negative integers."
+  )
+  assertthat::assert_that(
+    !("character" %in% c(numeric_class, factor_class)),
+    msg = "The predictor variables must not be of type 'character'. Please make sure that they are either of type 'integer', 'numeric', or 'factor'."
+  )
+  if (data_mode == "binomial") {
     successes <- data[[response_vars[1]]]
     size <- data[[response_vars[2]]]
-    assertthat::assert_that(all(successes <= size),
-                            msg = "In a binomial distribution, the number of successes must be less than or equal to the size of the draw. Please validate your response variables.")
+    assertthat::assert_that(
+      all(successes <= size),
+      msg = "In a binomial distribution, the number of successes must be less than or equal to the size of the draw. Please validate your response variables."
+    )
   }
   # I can probably implicitly handle this case internally, but my gut says
   # that is better to complain to the user so that they are aware of the
@@ -150,10 +165,14 @@
   data_mode <- fls[["data_mode"]]
   LHS       <- fls[["LHS"]]
 
-  assertthat::assert_that(link %in% c("logit", "probit"),
-                          msg = "'Link' function must be either 'logit' or 'probit'.")
-  assertthat::assert_that(data_mode %in% c("bernoulli", "binomial"),
-                          msg = "Data must be either in bernoulli form (0's and 1's) or binomial form (k successes in n trials).")
+  assertthat::assert_that(
+    link %in% c("logit", "probit"),
+    msg = "'Link' function must be either 'logit' or 'probit'."
+  )
+  assertthat::assert_that(
+    data_mode %in% c("bernoulli", "binomial"),
+    msg = "Data must be either in bernoulli form (0's and 1's) or binomial form (k successes in n trials)."
+  )
 
   if (data_mode == "bernoulli" && link == "logit") {
 
@@ -279,8 +298,10 @@
 .buildLinkFormula <- function(metadata, link, has_intercept) {
 
   # Assertions ---------------------------------------------------------------
-  assertthat::assert_that(link %in% c("logit", "probit"),
-                          msg = "'Link' function must be either 'logit' or 'probit'.")
+  assertthat::assert_that(
+    link %in% c("logit", "probit"),
+    msg = "'Link' function must be either 'logit' or 'probit'."
+  )
 
   m_prob <- "theta[i]"
   m_lm <- .buildLinearModel(metadata, has_intercept)
@@ -345,8 +366,10 @@
 # Change factor variables to integer values. Convert data frame to list
 .processData <- function(data, metadata) {
 
-  assertthat::assert_that(!("N" %in% names(data)),
-                          msg = "'N' is a reserved variable name in bayesPF. Please rename this column to something else.")
+  assertthat::assert_that(
+    !("N" %in% names(data)),
+    msg = "'N' is a reserved variable name in bayesPF. Please rename this column to something else."
+  )
 
   fvs <- metadata[["vars"]][["factor"]]
 

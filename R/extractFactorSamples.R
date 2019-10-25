@@ -5,7 +5,7 @@
 #'
 #' @param fit An object returned from `bayesPF()`.
 #' @export
-#' @importFrom purrr map2
+#' @importFrom purrr map map2
 extractFactorSamples <- function(fit) {
 
   fstan   <- fit[["f2stan"]]
@@ -25,7 +25,7 @@ extractFactorSamples <- function(fit) {
 
   # get number of factor levels
   N_levels <- data[paste0("N_", fvs)]
-  N_levels_seq <- map(N_levels, ~seq(1, .x, 1))
+  N_levels_seq <- purrr::map(N_levels, ~seq(1, .x, 1))
   names(N_levels_seq) <- fvs
 
   # get names of factor levels

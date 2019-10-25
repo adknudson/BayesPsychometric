@@ -59,7 +59,7 @@ bayesPF <- function(formula, data, link,
   # Number of cores -------------------
   if (cores < 0) cores <- 1
   options(mc.cores = min(as.integer(cores), parallel::detectCores()))
-  rstan_options(auto_write = TRUE)
+  rstan::rstan_options(auto_write = TRUE)
 
   # Parameter inits -------------------
   inits <- list()
@@ -97,7 +97,7 @@ bayesPF <- function(formula, data, link,
   # Sending all arguments to stan --------------------------------------------
   if (sample) {
     message("The model is now compiling. This may take a minute.")
-    fit <- stan(
+    fit <- rstan::stan(
       model_name = "BayesPF",
       model_code = model_code,
       data       = data,

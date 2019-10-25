@@ -8,13 +8,14 @@
 ##############################################################################
 
 #============================================================================= .extractFromFormula
-#'
+#' Returns a decomposed formula
 #'
 #' Takes in a formula such as
 #'
 #'     y|k ~ x1 + x2 + factor1 + factor 2
 #'
 #' and extracts helpful information like terms, response, intercept, etc.
+#' @noRd
 .extractFromFormula <- function(formula) {
 
   fstr  <- as.character(formula)

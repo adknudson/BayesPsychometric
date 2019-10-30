@@ -42,14 +42,16 @@ extractFactorSamples <- function(fit) {
   factorSamples <- list()
 
   # Cases
+  # We need to retain the names of expand_levels_num which get dropped when the
+  # number of factors is 1. Fix this by setting drop=FALSE
   if (has_numeric && has_factor && !has_intercept) {
     # y ~ (bx1 + bx1_k1)*x1 + (bx2 + bx2_k1)*x2 + ...
 
     for (nv in nvs) {
       tmp <- list()
       for (i in seq_len(nrow(expand_levels_num))) {
-        int_list <- as.list(expand_levels_num[i, ])
-        fct_list <- as.list(expand_levels_fct[i, ])
+        int_list <- as.list(expand_levels_num[i, , drop=FALSE])
+        fct_list <- as.list(expand_levels_fct[i, , drop=FALSE])
 
         names(int_list) <- paste0("b", nv, "_", names(int_list))
         smp <- samples[names(int_list)]
@@ -64,8 +66,8 @@ extractFactorSamples <- function(fit) {
     # y ~ a + k1 + k2 + ...
     tmp <- list()
     for (i in seq_len(nrow(expand_levels_num))) {
-      int_list <- as.list(expand_levels_num[i, ])
-      fct_list <- as.list(expand_levels_fct[i, ])
+      int_list <- as.list(expand_levels_num[i, , drop=FALSE])
+      fct_list <- as.list(expand_levels_fct[i, , drop=FALSE])
 
       names(int_list) <- paste0("a_", names(int_list))
       smp <- samples[names(int_list)]
@@ -79,8 +81,8 @@ extractFactorSamples <- function(fit) {
     # y ~ (a + k) + (bx1 + bx1_k1)*x1 + (bx2 + bx2_k1)*x2 + ...
     tmp <- list()
     for (i in seq_len(nrow(expand_levels_num))) {
-      int_list <- as.list(expand_levels_num[i, ])
-      fct_list <- as.list(expand_levels_fct[i, ])
+      int_list <- as.list(expand_levels_num[i, , drop=FALSE])
+      fct_list <- as.list(expand_levels_fct[i, , drop=FALSE])
 
       names(int_list) <- paste0("a_", names(int_list))
       smp <- samples[names(int_list)]
@@ -93,8 +95,8 @@ extractFactorSamples <- function(fit) {
     for (nv in nvs) {
       tmp <- list()
       for (i in seq_len(nrow(expand_levels_num))) {
-        int_list <- as.list(expand_levels_num[i, ])
-        fct_list <- as.list(expand_levels_fct[i, ])
+        int_list <- as.list(expand_levels_num[i, , drop=FALSE])
+        fct_list <- as.list(expand_levels_fct[i, , drop=FALSE])
 
         names(int_list) <- paste0("b", nv, "_", names(int_list))
         smp <- samples[names(int_list)]

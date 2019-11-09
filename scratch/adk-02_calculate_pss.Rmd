@@ -1,0 +1,73 @@
+---
+title: "Calculate PSS"
+author: "Alex Knudson"
+date: "11/7/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      comment = "#>",
+                      message = FALSE,
+                      warning = FALSE)
+
+library(tidyverse)
+library(kableExtra)
+
+devtools::load_all()
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+dat <- as_tibble(Sample_Data_Binomial)
+```
+
+# Fit a Basic Model
+
+```{r, echo=FALSE}
+dat %>%
+  head(10) %>%
+  kable() %>%
+  kable_styling()
+```
+
+
+```{r fit_dat, results='hide', cache=TRUE}
+fit <- bayesPF(y|k ~ x1 + gender + age, dat, "logit", 
+               chains = 4, warmup = 2000, iter = 4500, cores = 4)
+```
+
+
+```{r}
+str(fit, max.level = 2)
+```
+
+
+```{r}
+fit$factorSamples <- extractFactorSamples(fit)
+str(fit$factorSamples, max.level = 2)
+```
+
+# Calculating the PSS
+
+Can only calculate the PSS iff there is exactly one continuous predictor. I.e.
+
+$$
+F(\pi) = \alpha_0 + \alpha_i^{A} + \alpha_i^{B} + \ldots + (\beta_0 + \beta_i^{A} + \beta_i^{B} + \ldots + ) \times x
+$$
+
+Later on we can expand this to multiple continuous predictors if we assume that all but one are fixed. This could be useful for situations where something like cholesterol is measured. This value is continuous, but fixed for an individual.
+
+In the mean time, for a single continuous predictor, we can calculate the PSS, JNI, and JND at the same for all factor combinations. We need only to find the factor combos and then calculate $-\alpha / \beta$. This will leave us with a distribution of values from which we can get the point estimates.
+
+```{r}
+pss_dist <- map2(fit$factorSamples$a, fit$factorSamples$x1, ~ -.x / .y)
+
+pss_jni <- map(pss_dist, ~unname(quantile(.x, probs = c(0.50, 0.95))))
+pss_jni_jnd <- map2(pss_jni, map(pss_jni, diff), ~ c(.x, .y))
+
+pss_jni_jnd
+```
+
+
+
+

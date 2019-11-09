@@ -1,14 +1,93 @@
 ---
-title: "Bayes Psychometric"
-author: "Alex Knudson"
-date: "9/27/2019"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE,
+                      comment = "#>",
+                      fig.path = "README-")
 ```
 
-# Bayes Psychometric
+# BayesPsychometric
 
-This package is largely just a wrapper for `rethinking` by McElreath, which is largly a wrapper for `rstan`. This focus of this package is on simplifying and automating the process of fitting psychometric functions.
+# Overview
+
+`BayesPsychometric` is a package designed for researchers primarily in the field of psychology, though others may still find it useful. It provides a set of tools for fitting psychometric (psychophysical) functions with mixed continuous and categorical data using a Bayesian framework built on top of <a href='https://mc-stan.org/'>Stan<img src='https://github.com/stan-dev/logos/blob/master/logo_tm.png?raw=true' target='_blank' height="12" /></a>.
+
+# Installation
+
+Since `BayesPsychometric` depends on `RStan`, it is best to install that first using the directions on the `RStan` [github page](https://github.com/stan-dev/rstan/wiki/RStan-Getting-Started). From their page, it is recommended that you first remove anying existing RStan
+
+```r
+remove.packages("rstan")
+if (file.exists(".RData")) file.remove(".RData")
+```
+
+Then, restart R
+
+In most cases, you can simply type (exactly like this)
+
+```{r, eval=FALSE}
+install.packages("rstan", repos = "https://cloud.r-project.org/", dependencies = TRUE)
+```
+
+You'll really want to check on the installation page for post-installation steps (like setting up the C++ toolchain if required).
+
+Then you can install `BayesPsychometric` via
+
+```{r, eval=FALSE}
+devtools::install_github("adknudson/BayesPsychometric")
+
+# Or the development branch
+devtools::install_github("adknudson/BayesPsychometric", ref = "develop")
+```
+
+# Usage
+
+The main function for fitting is `bayesPF` (which stands for Bayes Psychometric Function). The syntax is very similar to that of the base `glm` function, but with a slight twist. The function can handle data that is either in **binary** format (outcome is 0 or 1) or **binomial** format ($k$ success in $n$ trials).
+
+There are two built-in synthetic data sets called `Sample_Data_Bernoulli` (binary) and `Sample_Data_Binomial` (binomial) that can be used to test the functionality of this package.
+
+Binary data syntax:
+
+```{r, eval=FALSE}
+bayesPF(y ~ x1 + gender + age, data = Sample_Data_Bernoulli, link = "logit")
+```
+
+Binomial data syntax:
+
+```{r, eval=FALSE}
+bayesPF(y|k ~ x1 + gender + age, data = Sample_Data_Binomial, link = "logit")
+```
+
+The only real difference is that for binomial data, the response is specified as the number of success, $y$, given a number of trials, $k$. Estimates for each combination of factors can be extracted using `extractFactorSamples(fit)` (see Model Assumptions).
+
+# Model Assumptions
+
+This package assumes a basic model shown below
+
+![Equation](https://latex.codecogs.com/gif.latex?%5Cbegin%7Balign*%7D%20F%28%5Cpi%29%20%26%3D%20%5Calpha%20&plus;%20%5Cbeta%20%5Ctimes%20x%20%5C%5C%20y%20%26%5Csim%20%5Ctext%7BBinomial%7D%28k%2C%20%5Cpi%29%20%5Cend%7Balign*%7D)
+
+where $F$ is the link function (either *logit* or *probit*). Where factor (or categorical) variables are included in the model, they will automatically contribute to the slope and intercept (varying slope, varying intercept model). Using the binary response example above, the model would be
+
+<!-- $$ -->
+<!-- \begin{align*} -->
+<!-- F(\pi) &= \alpha + \alpha_i^{gender} + \alpha_j^{age} + \left(\beta + \beta_i^{gender} + \beta_j^{age}\right) \times x_1 \\ -->
+<!-- y &\sim \text{Bernoulli}(\pi) -->
+<!-- \end{align*} -->
+<!-- $$ -->
+
+![Equation 2](https://latex.codecogs.com/png.latex?%5Cbegin%7Balign*%7D%20F%28%5Cpi%29%20%26%3D%20%5Calpha%20&plus;%20%5Calpha_i%5E%7Bgender%7D%20&plus;%20%5Calpha_j%5E%7Bage%7D%20&plus;%20%5Cleft%28%5Cbeta%20&plus;%20%5Cbeta_i%5E%7Bgender%7D%20&plus;%20%5Cbeta_j%5E%7Bage%7D%5Cright%29%20%5Ctimes%20x_1%20%5C%5C%20y%20%26%5Csim%20%5Ctext%7BBernoulli%7D%28%5Cpi%29%20%5Cend%7Balign*%7D)
+
+This model assumption extends to situations where there are more than one continuous predictor. The default (and currently only) behavior is to treat factor variables as contributing to changes in the slope and intercept (though the intercept can be specified to be excluded). E.g. the general model is 
+
+![General Equation](https://latex.codecogs.com/png.latex?%5Cbegin%7Balign*%7D%20F%28%5Cpi%29%20%26%3D%20%5Calpha%20&plus;%20%5Calpha_i%5E%7Bgender%7D%20&plus;%20%5Calpha_j%5E%7Bage%7D%20&plus;%20%5Cleft%28%5Cbeta%20&plus;%20%5Cbeta_i%5E%7Bgender%7D%20&plus;%20%5Cbeta_j%5E%7Bage%7D%5Cright%29%20%5Ctimes%20x_1%20&plus;%20%5Cleft%28%5Cgamma%20&plus;%20%5Cgamma_i%5E%7Bgender%7D%20&plus;%20%5Cgamma_j%5E%7Bage%7D%5Cright%29%20%5Ctimes%20x_2%20&plus;%20%5Cldots%20%5C%5C%20y%20%26%5Csim%20%5Ctext%7BBernoulli%7D%28%5Cpi%29%20%5Cend%7Balign*%7D)
+
+<!-- $$ -->
+<!-- \begin{align*} -->
+<!-- F(\pi) &= \alpha + \alpha_i^{gender} + \alpha_j^{age} + \left(\beta + \beta_i^{gender} + \beta_j^{age}\right) \times x_1 + \left(\beta + \beta_i^{gender} + \beta_j^{age}\right) \times x_2 + \ldots \\ -->
+<!-- y &\sim \text{Bernoulli}(\pi) -->
+<!-- \end{align*} -->
+<!-- $$ -->
+
+where x1, x2, ... are continuous predictors specified in the model. 

@@ -121,3 +121,13 @@ Equation](https://latex.codecogs.com/png.latex?%5Cbegin%7Balign*%7D%20F%28%5Cpi%
 <!-- $$ -->
 
 where x1, x2, … are continuous predictors specified in the model.
+
+# Other Thoughts
+
+If you happen to use this package for research or other projects, please
+share with me so I can get more ideas of how to expand the functionality
+of this package, and feature examples of how this package is being
+used\!
+
+I started writing this package as a way to simplify the tools that I’m
+using as I contribute to research at my school.

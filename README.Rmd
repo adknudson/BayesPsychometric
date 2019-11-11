@@ -66,7 +66,7 @@ The only real difference is that for binomial data, the response is specified as
 
 This package assumes a basic model shown below
 
-![Equation](https://latex.codecogs.com/gif.latex?%5Cbegin%7Balign*%7D%20F%28%5Cpi%29%20%26%3D%20%5Calpha%20&plus;%20%5Cbeta%20%5Ctimes%20x%20%5C%5C%20y%20%26%5Csim%20%5Ctext%7BBinomial%7D%28k%2C%20%5Cpi%29%20%5Cend%7Balign*%7D)
+![Equation](https://latex.codecogs.com/png.latex?%5Cbegin%7Balign*%7D%20F%28%5Cpi%29%20%26%3D%20%5Calpha%20&plus;%20%5Cbeta%5Ctimes%20x%20%5C%5C%20y%20%26%5Csim%20%5Ctext%7BBinomial%7D%28k%2C%20%5Cpi%29%20%5Cend%7Balign*%7D)
 
 where $F$ is the link function (either *logit* or *probit*). Where factor (or categorical) variables are included in the model, they will automatically contribute to the slope and intercept (varying slope, varying intercept model). Using the binary response example above, the model would be
 
@@ -79,7 +79,7 @@ where $F$ is the link function (either *logit* or *probit*). Where factor (or ca
 
 ![Equation 2](https://latex.codecogs.com/png.latex?%5Cbegin%7Balign*%7D%20F%28%5Cpi%29%20%26%3D%20%5Calpha%20&plus;%20%5Calpha_i%5E%7Bgender%7D%20&plus;%20%5Calpha_j%5E%7Bage%7D%20&plus;%20%5Cleft%28%5Cbeta%20&plus;%20%5Cbeta_i%5E%7Bgender%7D%20&plus;%20%5Cbeta_j%5E%7Bage%7D%5Cright%29%20%5Ctimes%20x_1%20%5C%5C%20y%20%26%5Csim%20%5Ctext%7BBernoulli%7D%28%5Cpi%29%20%5Cend%7Balign*%7D)
 
-This model assumption extends to situations where there are more than one continuous predictor. The default (and currently only) behavior is to treat factor variables as contributing to changes in the slope and intercept (though the intercept can be specified to be excluded). E.g. the general model is 
+This model assumption extends to situations where there are more than one continuous predictor. The default (and currently only) behavior is to treat factor variables as contributing to changes in the slope and intercept (though the intercept can be specified to be excluded). E.g. the general model is
 
 ![General Equation](https://latex.codecogs.com/png.latex?%5Cbegin%7Balign*%7D%20F%28%5Cpi%29%20%26%3D%20%5Calpha%20&plus;%20%5Calpha_i%5E%7Bgender%7D%20&plus;%20%5Calpha_j%5E%7Bage%7D%20&plus;%20%5Cleft%28%5Cbeta%20&plus;%20%5Cbeta_i%5E%7Bgender%7D%20&plus;%20%5Cbeta_j%5E%7Bage%7D%5Cright%29%20%5Ctimes%20x_1%20&plus;%20%5Cleft%28%5Cgamma%20&plus;%20%5Cgamma_i%5E%7Bgender%7D%20&plus;%20%5Cgamma_j%5E%7Bage%7D%5Cright%29%20%5Ctimes%20x_2%20&plus;%20%5Cldots%20%5C%5C%20y%20%26%5Csim%20%5Ctext%7BBernoulli%7D%28%5Cpi%29%20%5Cend%7Balign*%7D)
 
@@ -90,7 +90,7 @@ This model assumption extends to situations where there are more than one contin
 <!-- \end{align*} -->
 <!-- $$ -->
 
-where x1, x2, ... are continuous predictors specified in the model. 
+where x1, x2, ... are continuous predictors specified in the model.
 
 # Other Thoughts
 

@@ -13,6 +13,12 @@ logit(p)
 The log-odds of \code{p}, a real number symmetric around 0
 }
 \description{
-The function is defined by \deqn{\text{ln}\left(\frac{p}{1-p}\right)}{ln( p / ( 1 - p ) )}
-This function has an inverse, the [logistic()] function.
+The function is defined by
+\deqn{\text{ln}\left(\frac{p}{1-p}\right)}{ln( p / ( 1 - p ) )}
 }
+\seealso{
+\code{\link{logistic}}
+
+Other logistic equations: \code{\link{logistic}}
+}
+\concept{logistic equations}

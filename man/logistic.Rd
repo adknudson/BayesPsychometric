@@ -14,5 +14,10 @@ The logistic of \code{x}, a real number in the range \code{[0, 1]}
 }
 \description{
 The function is defined by \deqn{\frac{1}{1 + \exp(-x)}}{1 / ( 1 + exp(-x) )}
-This function is the inverse of the [logit()] function.
 }
+\seealso{
+\code{\link{logit}}
+
+Other logistic equations: \code{\link{logit}}
+}
+\concept{logistic equations}

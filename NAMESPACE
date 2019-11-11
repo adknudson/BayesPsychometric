@@ -3,6 +3,8 @@
 export(bayesPF)
 export(extractFactorSamples)
 export(f2stan)
+export(logistic)
+export(logit)
 import(rstan)
 importFrom(purrr,map)
 importFrom(purrr,map2)

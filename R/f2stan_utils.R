@@ -355,7 +355,10 @@
 # TODO: extend this function to handle partial and complete pooling modes
 .buildPriorFormula <- function(m_terms) {
 
-  lapply(c(m_terms[["intercepts"]], m_terms[["factor_coefs"]]), function(var) {
+  all_terms <- c(m_terms[["intercepts"]], m_terms[["factor_coefs"]])
+
+  # FUTURE: Check to see if `pooling` is specified, and set accordingly
+  lapply(all_terms, function(var) {
     paste0(var, " ~ normal(0, 10)")
   })
 

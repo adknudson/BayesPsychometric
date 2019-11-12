@@ -1,0 +1,193 @@
+---
+title: "Tadpoles - Multilevel Models"
+author: "Alex Knudson"
+date: "11/11/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(rethinking)
+library(tidyverse)
+devtools::load_all()
+```
+
+# Tadpole Data
+
+```{r}
+data("reedfrogs")
+d <- as_tibble(reedfrogs)
+glimpse(d)
+```
+
+# Null Model
+
+$$
+\begin{align*}
+\text{logit}(\pi) &= \alpha \\
+\text{surv} &\sim \text{Binomial}(\text{density}, \pi)
+\end{align*}
+$$
+
+# Varying Intercepts
+
+$$
+\begin{align*}
+\text{logit}(\pi) &= \alpha + \alpha_i^{\text{tank}}\\
+\text{surv} &\sim \text{Binomial}(\text{density}, \pi)
+\end{align*}
+$$
+
+or 
+
+$$
+\begin{align*}
+\text{logit}(\pi) &= \alpha_i^{\text{tank}}\\
+\text{surv} &\sim \text{Binomial}(\text{density}, \pi)
+\end{align*}
+$$
+
+
+```{r, results='hide'}
+d$tank <- factor(1:nrow(d))
+m12.1 <- bayesPF(surv|density ~ tank, d, "logit")
+```
+
+# Adaptive Pooling
+
+$$
+\begin{align*}
+\text{surv} &\sim \text{Binomial}(\text{density}, \pi) \\
+\text{logit}(\pi) &= \alpha + \alpha_i^{\text{tank}} \\
+\alpha^{\text{tank}} &\sim \mathcal{N}(\mu_{\alpha}^{\text{tank}}, \sigma_{\alpha}^{\text{tank}}) \\
+\mu_{\alpha}^{\text{tank}} &\sim \mathcal{N}(0, 1) \\
+\sigma_{\alpha}^{\text{tank}} &\sim \text{HalfCauchy}(0, 1)
+\end{align*}
+$$
+
+# Synthetic Data
+
+```{r}
+a <- 1.4
+sigma <- 1.5
+nponds <- 60
+ni <- as.integer(rep(c(5, 10, 25, 35), each = 15))
+
+a_pond <- rnorm(nponds, a, sigma)
+dsim <- tibble(pond = 1:nponds, 
+               ni = ni, 
+               true_a = a_pond,
+               si = rbinom(nponds, ni, logistic(true_a)),
+               p_nopool = si / ni)
+```
+
+## No Pooling Estimate
+
+$$
+\begin{align*}
+s_i &\sim \text{Binomial}(n_i, \pi) \\
+\text{logit}(\pi) &= \alpha^{\text{pond}} \\
+\alpha^{\text{pond}} &\sim \mathcal{N}(0, 10) \\
+\end{align*}
+$$
+
+```{r, results='hide'}
+m12.np <- map2stan(
+  alist(
+    si ~ dbinom(ni, p),
+    logit(p) <- a_pond[pond],
+    a_pond[pond] ~ dnorm(0, 10)
+  ),
+  data = as.data.frame(dsim), iter = 2e4, warmup = 1000
+)
+```
+
+## Partial Pooling Estimate
+
+$$
+\begin{align*}
+s_i &\sim \text{Binomial}(n_i, \pi) \\
+\text{logit}(\pi) &= \alpha^{\text{pond}} \\
+\alpha^{\text{pond}} &\sim \mathcal{N}(\mu_{\alpha}^{\text{pond}}, \sigma_{\alpha}^{\text{pond}}) \\
+\mu_{\alpha}^{\text{pond}} &\sim \mathcal{N}(0, 1) \\
+\sigma_{\alpha}^{\text{pond}} &\sim \text{HalfCauchy}(0, 1)
+\end{align*}
+$$
+
+```{r, results='hide'}
+m12.pp <- map2stan(
+  alist(
+    si ~ dbinom(ni, p),
+    logit(p) <- a_pond[pond],
+    a_pond[pond] ~ dnorm(mu_a_pond, sd_a_pond),
+    mu_a_pond ~ dnorm(0, 1),
+    sd_a_pond ~ dcauchy(0, 1)
+  ),
+  data = as.data.frame(dsim), iter = 2e4, warmup = 1000
+)
+```
+
+## Complete Pooling
+
+$$
+\begin{align*}
+s_i &\sim \text{Binomial}(n_i, \pi) \\
+\text{logit}(\pi) &= \alpha \\
+\alpha &\sim \mathcal{N}(0, 10) \\
+\end{align*}
+$$
+
+```{r, results='hide'}
+m12.cp <- map2stan(
+  alist(
+    si ~ dbinom(ni, p),
+    logit(p) <- a,
+    a ~ dnorm(0, 10)
+  ),
+  data = as.data.frame(dsim), iter = 2e4, warmup = 1000
+)
+```
+
+# More than one type of cluster
+
+```{r}
+data("chimpanzees")
+d <- chimpanzees %>%
+  mutate(L = pulled_left,
+         P = prosoc_left,
+         C = condition)
+```
+
+## No Pooling
+
+```{r, results='hide'}
+m12.4.np <- map2stan(
+  alist(
+    L ~ dbinom(1, p),
+    logit(p) <- a0 + a_actor[actor] + (bp + bpC * C) * P,
+    a0 ~ dnorm(0, 10),
+    a_actor[actor] ~ dnorm(0, 1),
+    bp ~ dnorm(0, 10),
+    bpC ~ dnorm(0, 10)
+  ), data = d, warmup = 1000, iter = 5000, chains = 4, cores = 4
+)
+```
+
+
+## Partial Pooling
+
+```{r, results='hide'}
+m12.4 <- map2stan(
+  alist(
+    L ~ dbinom(1, p),
+    logit(p) <- a0 + a_actor[actor] + (bp + bpC * C) * P,
+    a0 ~ dnorm(0, 10),
+    a_actor[actor] ~ dnorm(0, sd_a_actor),
+    sd_a_actor ~ dcauchy(0, 2.5),
+    bp ~ dnorm(0, 10),
+    bpC ~ dnorm(0, 10)
+  ), data = d, warmup = 1000, iter = 5000, chains = 4, cores = 4
+)
+```
+

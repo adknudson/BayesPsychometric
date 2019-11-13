@@ -367,7 +367,7 @@
     # Each prior needs to be an element in a list
     as.list(unlist(ret_list))
   } else {
-    lapply(all_coefs, function(var) {
+    lapply(unlist(m_coefs), function(var) {
       paste0(var, " ~ normal(0, 10)")
     })
   }

@@ -29,7 +29,7 @@
 #'                   return_f2stan = TRUE, return_stan_fit = TRUE)
 #' str(fit1.2)
 #' extract(fit1.2$fit)
-bayesPF <- function(formula, data, link,
+bayesPF <- function(formula, data, link, adaptive_pooling = FALSE,
                     chains = 1, iter = 2000, warmup = 1000, thin = 1,
                     cores = 1, ...,
                     sample = TRUE,
@@ -44,13 +44,14 @@ bayesPF <- function(formula, data, link,
 
   # Build the model from the formula -----------------------------------------
   # NOTE: this function modifies the data so it's important to reassign `data`
-  fstan <- f2stan(formula, data, link)
+  fstan <- f2stan(formula, data, link, adaptive_pooling)
   ret_list[["f2stan"]] <- fstan
 
   # Extract objects from fstan
   model_code <- fstan[["StanCode"]]
   data <- fstan[["data"]]
   metadata <- fstan[["metadata"]]
+  coef_list <- metadata$coefs
   has_intercept <- fstan[["has_intercept"]]
   nvs <- metadata[["vars"]][["numeric"]]
   fvs <- metadata[["vars"]][["factor"]]
@@ -73,6 +74,7 @@ bayesPF <- function(formula, data, link,
       }
     }
   }
+
   # Slope inits
   if (length(nvs) > 0) {
     for (nv in nvs) {
@@ -85,7 +87,18 @@ bayesPF <- function(formula, data, link,
       } # if fv
     } # for nv
   } # if nv
+
+  # Adaptive pooling inits
+  if(adaptive_pooling && length(fvs) > 0) {
+    for (coefs in coef_list) {
+      for (coef in coefs[-1]) {
+        inits[[concat("sd_", coef)]] <- 1
+      }
+    }
+  } # if adaptive pooling
+
   inits <- replicate(chains, inits, simplify = FALSE)
+  ret_list[["inits"]] <- inits
 
   # Warmup and iterations -------------
   if (is.null(warmup)) warmup <- iter %/% 2

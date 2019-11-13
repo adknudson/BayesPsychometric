@@ -316,52 +316,61 @@
 
 
 #============================================================================= .getModelTerms
-# TODO: Rewrtie this so that it's more in line with .buildLinearModel()
-.getModelTerms <- function(metadata, has_intercept){
+.getModelCoefs <- function(metadata, has_intercept){
 
   nvs <- metadata[["vars"]][["numeric"]]
   fvs <- metadata[["vars"]][["factor"]]
 
-  factor_coefs <- NULL
-  for (nv in nvs) {
-    if (length(fvs) == 0) {
-      factor_coefs <- c(factor_coefs, paste0("b", nv))
-    } else {
-      factor_coefs <- c(
-        factor_coefs,
-        paste0("b", nv),
-        paste0("b", nv, "_", fvs)
-      )
-    }
-  }
+  ret_list <- list()
 
-  intercepts <- NULL
   if (has_intercept) {
-    if (length(fvs) == 0) {
-      intercepts <- c(intercepts, "a0")
-    } else {
-      intercepts <- c(intercepts,
-                      "a0",
-                      paste0("a_", fvs))
+    # Every model with an intercept gets a shared intercept
+    tmp <- "a0"
+    if (length(fvs) > 0) {
+      # Every factor gets an intercept
+      tmp <- c(tmp, paste0("a_", fvs))
     }
+    ret_list[[1]] <- tmp
   }
 
-  list(factor_coefs = factor_coefs,
-       intercepts = intercepts)
+  if(length(nvs) > 0) {
+    for (nv in nvs) {
+      # Every numeric predictor gets a slope coefficient
+      tmp <- paste0("b", nv)
+      if (length(fvs) > 0) {
+        # Every factor contributes to a change in slope
+        tmp <- c(tmp, paste0("b", nv, "_", fvs))
+      }
+      ret_list[[length(ret_list) + 1]] <- tmp
+    } # for nv
+  } # if nv
+
+  ret_list
 }
 
 
 #============================================================================= .buildPriorFormula
-# TODO: extend this function to handle partial and complete pooling modes
-.buildPriorFormula <- function(m_terms) {
+.buildPriorFormula <- function(m_coefs, adaptive_pooling) {
 
-  all_terms <- c(m_terms[["intercepts"]], m_terms[["factor_coefs"]])
+  if(adaptive_pooling) {
+    ret_list <- list()
+    for (i in m_coefs) {
+      # Prior for the shared coefficient
+      tmp <- paste0(i[1], " ~ normal(0, 10)")
+      # Prior for the factor coefficients
+      tmp <- c(tmp, map(i[-1], ~ paste0(.x, " ~ normal(0, sd_", .x, ")")))
+      # Prior for the shared standard deviation for adaptive pooling
+      tmp <- c(tmp, map(i[-1], ~ paste0("sd_", .x, " ~ cauchy(0, 2.5)")))
 
-  # FUTURE: Check to see if `pooling` is specified, and set accordingly
-  lapply(all_terms, function(var) {
-    paste0(var, " ~ normal(0, 10)")
-  })
-
+      ret_list[[length(ret_list) + 1]] <- tmp
+    }
+    # Each prior needs to be an element in a list
+    as.list(unlist(ret_list))
+  } else {
+    lapply(all_coefs, function(var) {
+      paste0(var, " ~ normal(0, 10)")
+    })
+  }
 }
 
 
@@ -408,8 +417,11 @@
   fvs <- metadata[["vars"]][["factor"]]
   nvs_class <- metadata[["class"]][["numeric"]]
 
+  coef_list <- metadata[["coefs"]]
+
   LHS <- fls[["LHS"]]
   has_intercept <- fls[["include_intercept"]]
+  adaptive_pooling <- fls[["adaptive_pooling"]]
   data_mode <- fls[["data_mode"]]
 
   concat <- function(...) {
@@ -516,6 +528,22 @@
       } # if fv
     } # for nv
   } # if nv
+
+  # Adaptive pooling terms
+  if (adaptive_pooling && length(fvs) > 0) {
+    body_parameters <- concat(
+      body_parameters, "\n",
+      indent, "// Adaptive Pooling terms\n"
+    )
+    for (coefs in coef_list) {
+      for (coef in coefs[-1]) {
+        body_parameters <- concat(
+          body_parameters,
+          indent, paste0("real<lower=0> sd_", coef, ";\n")
+        )
+      } # for coef
+    } # for coef group
+  } # if adaptive
 
   # Build model block --------------------------------------------------------
   body_model <- concat(

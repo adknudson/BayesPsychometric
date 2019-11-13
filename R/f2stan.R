@@ -6,7 +6,7 @@
 #' @return A model and data that can be used by `rstan::stan` as well as
 #'   information about the model and the data.
 #' @export
-f2stan <- function(formula, data, link) {
+f2stan <- function(formula, data, link, adaptive_pooling = FALSE) {
 
   # Preliminary checks -------------------------------------------------------
   assertthat::assert_that(link %in% c("logit", "probit"),
@@ -14,6 +14,7 @@ f2stan <- function(formula, data, link) {
 
   # Extract features from formula --------------------------------------------
   fls <- .extractFromFormula(formula)
+  fls[["adaptive_pooling"]] <- adaptive_pooling
   has_intercept <- fls[["include_intercept"]]
 
   # Pre-process the data -----------------------------------------------------
@@ -26,8 +27,10 @@ f2stan <- function(formula, data, link) {
   # Build up the model pieces ------------------------------------------------
   m_dist  <- .buildDistributionFormula(fls, link)
   m_link  <- .buildLinkFormula(metadata, link, has_intercept)
-  m_terms <- .getModelTerms(metadata, has_intercept)
-  m_prior <- .buildPriorFormula(m_terms)
+  m_coefs <- .getModelCoefs(metadata, has_intercept)
+  m_prior <- .buildPriorFormula(m_coefs, adaptive_pooling)
+
+  metadata[["coefs"]] <- m_coefs
 
   model <- list(mode = m_dist,
                 linear_model = m_link,
@@ -43,6 +46,7 @@ f2stan <- function(formula, data, link) {
   # model
   list(formula = formula,
        has_intercept = has_intercept,
+       adaptive_pooling = adaptive_pooling,
        metadata = metadata,
        data = data,
        StanCode = StanCode)

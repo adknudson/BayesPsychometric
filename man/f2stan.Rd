@@ -4,7 +4,7 @@
 \alias{f2stan}
 \title{Convert a typical formula to a formula list that map2stan can understand}
 \usage{
-f2stan(formula, data, link)
+f2stan(formula, data, link, adaptive_pooling = FALSE)
 }
 \arguments{
 \item{formula}{A formula that you would pass to `glm` or similar.}

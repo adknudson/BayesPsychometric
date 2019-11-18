@@ -33,18 +33,12 @@ dat %>%
 
 ```{r fit_dat, results='hide', cache=TRUE}
 fit <- bayesPF(y|k ~ x1 + gender + age, dat, "logit", 
-               chains = 4, warmup = 2000, iter = 4500, cores = 4)
+               chains = 2, cores = 2, thin = 2)
 ```
 
 
 ```{r}
 str(fit, max.level = 2)
-```
-
-
-```{r}
-fit$factorSamples <- extractFactorSamples(fit)
-str(fit$factorSamples, max.level = 2)
 ```
 
 # Calculating the PSS
@@ -68,6 +62,11 @@ pss_jni_jnd <- map2(pss_jni, map(pss_jni, diff), ~ c(.x, .y))
 pss_jni_jnd
 ```
 
+# No intercept
 
 
+```{r}
+fit_ni <- bayesPF(y|k ~ 0 + x1, dat, "logit", 
+               chains = 2, cores = 2, thin = 2)
+```
 

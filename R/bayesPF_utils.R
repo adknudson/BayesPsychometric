@@ -127,10 +127,11 @@
 
   nvs <- fstan[["metadata"]][["vars"]][["numeric"]]
   fvs <- fstan[["metadata"]][["vars"]][["factor"]]
-  assertthat::assert_that(
-    length(fvs) > 0,
-    msg = "There must be factors in the model for this function to work."
-  )
+
+  if (length(fvs) == 0) {
+    warning("Model must have factor variables in order to compute factor samples.")
+    return(NULL)
+  }
 
   has_intercept <- fstan[["has_intercept"]]
   has_numeric   <- length(nvs) > 0

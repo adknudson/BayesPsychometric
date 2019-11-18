@@ -124,6 +124,7 @@ bayesPF <- function(formula, data, link, adaptive_pooling = FALSE,
     samples <- rstan::extract(fit)
     samples <- .processSamples(samples, data, metadata, has_intercept)
     ret_list[["samples"]] <- samples
+    ret_list[["factorSamples"]] <- .extractFactorSamples(ret_list)
 
     if (return_stan_fit) ret_list[["fit"]] <- fit
   }

@@ -45,6 +45,7 @@ f2stan <- function(formula, data, link, adaptive_pooling = FALSE) {
   # Return the model ---------------------------------------------------------
   # model
   list(formula = formula,
+       link = link,
        has_intercept = has_intercept,
        adaptive_pooling = adaptive_pooling,
        metadata = metadata,

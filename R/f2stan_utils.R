@@ -36,7 +36,10 @@
   # Assertions
   assertthat::assert_that(
     length(LHS) %in% c(1,2),
-    msg = paste("The number of arguments on the left hand side of the equation must be 1 (for bernoulli data) or 2 (for binomial data). The number of args on the LHS is", length(LHS))
+    msg = paste("The number of arguments on the left hand side of the",
+                "equation must be 1 (for bernoulli data) or 2",
+                "(for binomial data). The number of args on the LHS is", 
+                length(LHS))
   )
   assertthat::assert_that(
     all(attr(fterm, "order") == 1),
@@ -44,7 +47,8 @@
   )
   # Maybe disallow users from specifying a model with no intercept?
   if (!fint) {
-    warning("Specifying a model with no intercept implicitly constrains the y-intercept to be 0.5 (0 on the log-odds scale).")
+    warning(paste("Specifying a model with no intercept implicitly constrains", 
+                  "the y-intercept to be 0.5 (0 on the log-odds scale)."))
   }
 
   list(vars = fvars,
@@ -557,6 +561,18 @@
     indent, "}\n",
     indent, model[["mode"]], ";\n"
   )
+
+  # Build generated quantities block -----------------------------------------
+  # TODO: Add this block to the stan code
+  # generated quantities{
+  #   real log_lik = 0;
+  #
+  #   for (i in 1:N) {
+  #     real theta = a0 + a_age_group[age_group[i]] + a_trial[trial[i]] + (bsoa + bsoa_age_group[age_group[i]] + bsoa_trial[trial[i]]) * soa[i];
+  #     log_lik += bernoulli_logit_lpmf(response[i] | theta);
+  #   }
+  # }
+
 
   # Return the entire model --------------------------------------------------
   concat(

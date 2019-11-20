@@ -9,13 +9,15 @@
 f2stan <- function(formula, data, link, adaptive_pooling = FALSE) {
 
   # Preliminary checks -------------------------------------------------------
-  assertthat::assert_that(link %in% c("logit", "probit"),
-                          msg = "'Link' function must be either 'logit' or 'probit'.")
+  assertthat::assert_that(
+    link %in% c("logit", "probit"),
+    msg = "'Link' function must be either 'logit' or 'probit'."
+  )
 
   # Extract features from formula --------------------------------------------
   fls <- .extractFromFormula(formula)
   fls[["adaptive_pooling"]] <- adaptive_pooling
-  has_intercept <- fls[["include_intercept"]]
+  has_intercept <- fls[["has_intercept"]]
 
   # Pre-process the data -----------------------------------------------------
   # Standardize the numeric variables

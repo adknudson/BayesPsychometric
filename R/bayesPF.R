@@ -31,30 +31,26 @@
 #' extract(fit1.2$fit)
 bayesPF <- function(formula, data, link, adaptive_pooling = FALSE,
                     chains = 1, iter = 2000, warmup = 1000, thin = 1,
-                    cores = 1, ...,
-                    sample = TRUE,
-                    return_stan_fit = FALSE) {
+                    cores = 1, ..., sample = TRUE) {
 
   concat <- function(...) {
     paste(..., collapse = "", sep = "")
   }
 
-  # Initialize an empty return list
-  ret_list <- list()
-
   # Build the model from the formula -----------------------------------------
   # NOTE: this function modifies the data so it's important to reassign `data`
-  fstan <- f2stan(formula, data, link, adaptive_pooling)
-  ret_list[["f2stan"]] <- fstan
+  f_ls <- f2stan(formula, data, link, adaptive_pooling)
 
-  # Extract objects from fstan
-  model_code <- fstan[["StanCode"]]
-  data <- fstan[["data"]]
-  metadata <- fstan[["metadata"]]
-  coef_list <- metadata$coefs
-  has_intercept <- fstan[["has_intercept"]]
+  # Extract objects from f_ls
+  stan_code <- f_ls[["stan_code"]]
+  data <- f_ls[["data"]]
+  metadata <- f_ls[["metadata"]]
+  coef_list <- metadata[["coefs"]]
+  has_intercept <- f_ls[["has_intercept"]]
   nvs <- metadata[["vars"]][["numeric"]]
   fvs <- metadata[["vars"]][["factor"]]
+  has_numeric <- length(nvs) > 0
+  has_factor  <- length(fvs) > 0
 
   # Prepare arguments for Stan -----------------------------------------------
   # Number of cores -------------------
@@ -66,30 +62,30 @@ bayesPF <- function(formula, data, link, adaptive_pooling = FALSE,
   inits <- list()
   # Intercept inits
   if (has_intercept) {
-    inits[["a0"]] <- 0
+    inits[["a"]] <- "random"
     # Factor intercepts
-    if (length(fvs) > 0) {
+    if (has_factor) {
       for (fv in fvs) {
-        inits[[concat("a_", fv)]] <- rep(0, data[[concat("N_", fv)]])
+        inits[[concat("a_", fv)]] <- rep("random", data[[concat("N_", fv)]])
       }
     }
   }
 
   # Slope inits
-  if (length(nvs) > 0) {
+  if (has_numeric) {
     for (nv in nvs) {
-      inits[[concat("b", nv)]] <- 0
+      inits[[concat("b", nv)]] <- "random"
       # Factor slope terms
-      if (length(fvs) > 0) {
+      if (has_factor) {
         for (fv in fvs) {
-          inits[[concat("b", nv, "_", fv)]] <- rep(0, data[[concat("N_", fv)]])
+          inits[[concat("b", nv, "_", fv)]] <- rep("random", data[[concat("N_", fv)]])
         } # for fv
       } # if fv
     } # for nv
   } # if nv
 
   # Adaptive pooling inits
-  if(adaptive_pooling && length(fvs) > 0) {
+  if(adaptive_pooling && has_factor) {
     for (coefs in coef_list) {
       for (coef in coefs[-1]) {
         inits[[concat("sd_", coef)]] <- 1
@@ -98,7 +94,6 @@ bayesPF <- function(formula, data, link, adaptive_pooling = FALSE,
   } # if adaptive pooling
 
   inits <- replicate(chains, inits, simplify = FALSE)
-  ret_list[["inits"]] <- inits
 
   # Warmup and iterations -------------
   if (is.null(warmup)) warmup <- iter %/% 2
@@ -112,23 +107,17 @@ bayesPF <- function(formula, data, link, adaptive_pooling = FALSE,
     message("The model is now compiling. This may take a minute.")
     fit <- rstan::stan(
       model_name = "BayesPF",
-      model_code = model_code,
+      model_code = stan_code,
       data       = data,
       init       = inits,
       iter       = iter,
       warmup     = warmup,
       chains     = chains,
       thin       = thin, ...)
-
-    # Extract and process samples ----------------------------------------------
-    samples <- rstan::extract(fit)
-    samples <- .processSamples(samples, data, metadata, has_intercept)
-    ret_list[["samples"]] <- samples
-    ret_list[["factorSamples"]] <- .extractFactorSamples(ret_list)
-
-    if (return_stan_fit) ret_list[["fit"]] <- fit
+  } else {
+    message("If you don't want to return samples, you may also want to consider the function f2stan() to generate the Stan code.")
   }
 
   # Return the results
-  ret_list
+  list(stanfit = fit, f_ls = f_ls)
 }

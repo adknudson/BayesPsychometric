@@ -15,8 +15,31 @@ f2stan <- function(formula,
 
   f_ls <- process_formula(formula)
   f_ls[["adaptive_pooling"]] <- adaptive_pooling
+  has_intercept <- f_ls[["has_intercept"]]
+
+  # Cannot specify a model with adaptive pooling and without an intercept
+  # Truth table. P = adaptive pooling, Q = has intercept
+  # P  Q  Output || !P  Q  !P||Q
+  # T  T  T      || F   T  T
+  # T  F  F      || F   F  F
+  # F  T  T      || T   T  T
+  # F  F  T      || T   F  T
+  assertthat::assert_that(
+    !adaptive_pooling || has_intercept,
+    msg = paste("If adaptive pooling is specified,",
+                "then you must specify a model with an intercept and factors.")
+  )
 
   metadata <- get_metadata(data, f_ls)
+  has_factor <- length(metadata[["vars"]][["factor"]]) > 0
+
+  # Cannot specify a model with adaptive pooling and without factor variables. See the
+  # truth table above because it is the same for factors.
+  assertthat::assert_that(
+    !adaptive_pooling || has_factor,
+    msg = paste("If adaptive pooling is specified,",
+                "then you must specify a model with an intercept and factors.")
+  )
 
   data <- process_data(data, metadata)
 
@@ -25,7 +48,7 @@ f2stan <- function(formula,
   # Return the model ---------------------------------------------------------
   list(formula = formula,
        link = link,
-       has_intercept = f_ls[["has_intercept"]],
+       has_intercept = has_intercept,
        adaptive_pooling = adaptive_pooling,
        metadata = metadata,
        data = data,

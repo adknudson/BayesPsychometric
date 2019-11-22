@@ -53,8 +53,8 @@ get_metadata <- function(data, f_ls) {
     !has_character,
     msg = paste("The model must not contain character variables.",
                 "The offending",
-                ifelse(length(cvs) == 1, "variable is:", "variables are:"),
-                cvs, ". Did you mean for these to be factor variables instead?")
+                ifelse(length(cvs) == 1, "variable is:\n\t", "variables are:\n\t"),
+                cvs, "\nDid you mean for these to be factor variables instead?")
   )
 
   # Get list of internal coefficients
@@ -229,7 +229,7 @@ make_stan <- function(metadata, f_ls, link) {
   )
 
   # Create priors ------------------------------------------------------------
-  if(adaptive_pooling) {
+  if(adaptive_pooling && has_intercept) {
     ret_list <- list()
     for (i in m_coefs) {
       # Prior for the shared coefficient
@@ -352,7 +352,7 @@ make_stan <- function(metadata, f_ls, link) {
     # y ~ b1*x1 + b2*x2 + ...
     body_parameters <- concat(
       indent, "// Slope terms\n",
-      paste0(indent, "real b_", nvs, ";\n")
+      concat(indent, "real b_", nvs, ";\n")
     )
 
   } else if (!has_numeric && has_factor && !has_intercept) {
@@ -409,7 +409,7 @@ make_stan <- function(metadata, f_ls, link) {
     body_parameters <- concat(
       body_parameters, "\n",
       indent, "// Slope terms\n",
-      concat(indent, "real b_", nvs, ";\n"),
+      concat(indent, "real b_", nvs, ";\n")
     )
     for (nv in nvs) {
       body_parameters <- concat(
@@ -420,7 +420,7 @@ make_stan <- function(metadata, f_ls, link) {
   }
 
   # Adaptive pooling terms
-  if (adaptive_pooling && has_factor) {
+  if (adaptive_pooling && has_factor && has_intercept) {
     body_parameters <- concat(
       body_parameters, "\n",
       indent, "// Adaptive Pooling terms\n"

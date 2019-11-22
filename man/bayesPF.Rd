@@ -6,25 +6,23 @@
 \usage{
 bayesPF(formula, data, link, adaptive_pooling = FALSE, chains = 1,
   iter = 2000, warmup = 1000, thin = 1, cores = 1, ...,
-  sample = TRUE, return_stan_fit = FALSE)
+  sample = TRUE)
 }
 \arguments{
 \item{formula}{A formula that one would pass to `glm` or similar}
 
-\item{data}{A data.frame or list}
+\item{data}{A data.frame object}
 
 \item{link}{A link function (either "logit" or "probit")}
 
+\item{adaptive_pooling}{Logical (FALSE by default) Specifies whether
+adaptive pooling should be used when fitting the model. Requires that both
+an intecept and at least one factor variable is included in the formula.}
+
 \item{...}{Other parameters to be passed to `rstan::stan()`.}
 
-\item{sample}{Whether to sample from the model or just build the model
-without sampling}
-
-\item{return_stan_fit}{Return the full model created by `rstan::stan()`.
-Useful for debugging or using other `rstan` functions.}
-
-\item{return_f2stan}{Return the data and parameters generated internally by
-`f2stan()`. Useful for debugging.}
+\item{sample}{Logical. Whether to sample from the model or just build the
+model without sampling}
 }
 \description{
 Fits a psychometric function

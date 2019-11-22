@@ -2,6 +2,7 @@
 
 export(bayesPF)
 export(f2stan)
+export(getLink)
 export(logistic)
 export(logit)
 import(rstan)

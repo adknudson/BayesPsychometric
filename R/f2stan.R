@@ -1,53 +1,57 @@
-#' Convert a typical formula to a formula list that map2stan can understand
+#' Convert a typical logistic equation formula into a Stan code
 #'
 #' @param formula A formula that you would pass to `glm` or similar.
 #' @param data A data frame of observations.
-#' @param link A link function such as "logit" or "probit"
+#' @param link A link function (either "logit" or "probit")
+#' @param adaptive_pooling Logical (FALSE by default) Specifies whether
+#'   adaptive pooling should be used when fitting the model. Requires that
+#'   both an intecept and factor variables are included in the formula.
 #' @return A model and data that can be used by `rstan::stan` as well as
 #'   information about the model and the data.
 #' @export
-f2stan <- function(formula, data, link, adaptive_pooling = FALSE) {
+f2stan <- function(formula,
+                   data,
+                   link = c("logit", "probit"),
+                   adaptive_pooling = FALSE) {
 
-  # Preliminary checks -------------------------------------------------------
-  assertthat::assert_that(link %in% c("logit", "probit"),
-                          msg = "'Link' function must be either 'logit' or 'probit'.")
+  f_ls <- process_formula(formula)
+  f_ls[["adaptive_pooling"]] <- adaptive_pooling
+  has_intercept <- f_ls[["has_intercept"]]
 
-  # Extract features from formula --------------------------------------------
-  fls <- .extractFromFormula(formula)
-  fls[["adaptive_pooling"]] <- adaptive_pooling
-  has_intercept <- fls[["include_intercept"]]
+  # Cannot specify a model with adaptive pooling and without an intercept
+  # Truth table. P = adaptive pooling, Q = has intercept
+  # P  Q  Output || !P  Q  !P||Q
+  # T  T  T      || F   T  T
+  # T  F  F      || F   F  F
+  # F  T  T      || T   T  T
+  # F  F  T      || T   F  T
+  assertthat::assert_that(
+    !adaptive_pooling || has_intercept,
+    msg = paste("If adaptive pooling is specified,",
+                "then you must specify a model with an intercept and factors.")
+  )
 
-  # Pre-process the data -----------------------------------------------------
-  # Standardize the numeric variables
-  data <- .preProcessData(fls, data)
+  metadata <- get_metadata(data, f_ls)
+  has_factor <- length(metadata[["vars"]][["factor"]]) > 0
 
-  # Get the class of each column in the model --------------------------------
-  metadata <- .getDataClasses(fls, data)
+  # Cannot specify a model with adaptive pooling and without factor variables. See the
+  # truth table above because it is the same for factors.
+  assertthat::assert_that(
+    !adaptive_pooling || has_factor,
+    msg = paste("If adaptive pooling is specified,",
+                "then you must specify a model with an intercept and factors.")
+  )
 
-  # Build up the model pieces ------------------------------------------------
-  m_dist  <- .buildDistributionFormula(fls, link)
-  m_link  <- .buildLinkFormula(metadata, link, has_intercept)
-  m_coefs <- .getModelCoefs(metadata, has_intercept)
-  m_prior <- .buildPriorFormula(m_coefs, adaptive_pooling)
+  data <- process_data(data, metadata)
 
-  metadata[["coefs"]] <- m_coefs
-
-  model <- list(mode = m_dist,
-                linear_model = m_link,
-                priors = m_prior)
-
-  # Process the data ---------------------------------------------------------
-  data <- .processData(data, metadata)
-
-  # Build the Stan code
-  StanCode <- .buildStanCode(data, model, fls, metadata)
+  stan_code <- make_stan(metadata, f_ls, link)
 
   # Return the model ---------------------------------------------------------
-  # model
   list(formula = formula,
+       link = link,
        has_intercept = has_intercept,
        adaptive_pooling = adaptive_pooling,
        metadata = metadata,
        data = data,
-       StanCode = StanCode)
+       stan_code = stan_code)
 }

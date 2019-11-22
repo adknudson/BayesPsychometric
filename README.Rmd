@@ -92,6 +92,10 @@ This model assumption extends to situations where there are more than one contin
 
 where x1, x2, ... are continuous predictors specified in the model.
 
+# Adaptive Pooling
+
+Adaptive pooling is a functionality that allows for multilevel (heirarchical) modeling. It essentially allows information to be shared across different levels in the presence of factor variables (see McElreath, Statistical Rethinking). This feature generally has the benefit of acting as a regularization among parameters, and in some cases it can overcome the problem of complete separation among categories and the response.
+
 # Other Thoughts
 
 If you happen to use this package for research or other projects, please share with me so I can get more ideas of how to expand the functionality of this package, and feature examples of how this package is being used!

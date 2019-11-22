@@ -1,3 +1,6 @@
+#' Extracts important features from the formula
+#'
+#' @noRd
 # Process the formula ========================================================
 process_formula <- function(f) {
   f_str  <- as.character(f)
@@ -22,7 +25,9 @@ process_formula <- function(f) {
        data_mode = data_mode)
 }
 
-
+#' Extracts information about the data set such as class type, etc.
+#'
+#' @noRd
 # Get the metadata ===========================================================
 get_metadata <- function(data, f_ls) {
 
@@ -108,9 +113,10 @@ get_metadata <- function(data, f_ls) {
        coefs = ret_list)
 }
 
-
+#' Turn factors into integers, get number of levels, etc.
+#'
+#' @noRd
 # Process the data ===========================================================
-# Turn factors into integers, get number of levels, etc.
 process_data <- function(data, metadata) {
 
   fvs <- metadata[["vars"]][["factor"]]
@@ -132,6 +138,9 @@ process_data <- function(data, metadata) {
 }
 
 
+#' Create the Stan code from the formula and data
+#'
+#' @noRd
 # Build the Stan code ========================================================
 make_stan <- function(metadata, f_ls, link) {
   concat <- function(...) {

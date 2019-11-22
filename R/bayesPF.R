@@ -1,14 +1,14 @@
 #' Fits a psychometric function
 #' @param formula A formula that one would pass to `glm` or similar
-#' @param data A data.frame or list
+#' @param data A data.frame object
 #' @param link A link function (either "logit" or "probit")
+#' @param adaptive_pooling Logical (FALSE by default) Specifies whether
+#'   adaptive pooling should be used when fitting the model. Requires that both
+#'   an intecept and at least one factor variable is included in the formula.
 #' @param ... Other parameters to be passed to `rstan::stan()`.
-#' @param sample Whether to sample from the model or just build the model
-#'   without sampling
-#' @param return_f2stan Return the data and parameters generated internally by
-#'   `f2stan()`. Useful for debugging.
-#' @param return_stan_fit Return the full model created by `rstan::stan()`.
-#'   Useful for debugging or using other `rstan` functions.
+#' @param sample Logical. Whether to sample from the model or just build the
+#'   model without sampling
+#'
 #' @export
 #' @examples
 #' # Load the data
@@ -78,7 +78,8 @@ bayesPF <- function(formula, data, link, adaptive_pooling = FALSE,
       # Factor slope terms
       if (has_factor) {
         for (fv in fvs) {
-          inits[[concat("b", nv, "_", fv)]] <- rep("random", data[[concat("N_", fv)]])
+          inits[[concat("b", nv, "_", fv)]] <- rep("random",
+                                                   data[[concat("N_", fv)]])
         } # for fv
       } # if fv
     } # for nv
@@ -98,7 +99,9 @@ bayesPF <- function(formula, data, link, adaptive_pooling = FALSE,
   # Warmup and iterations -------------
   if (is.null(warmup)) warmup <- iter %/% 2
   if (warmup > iter) {
-    warning("'warmup' must not be greater than 'iter'. Assuming that the user meant for 'iter' to be the number of post-warmup draws. Setting iter = iter + warmup.")
+    warning(paste("'warmup' must not be greater than 'iter'. Assuming that",
+                  "the user meant for 'iter' to be the number of post-warmup",
+                  "draws. Setting iter = iter + warmup."))
     iter <- iter + warmup
   }
 
@@ -115,7 +118,8 @@ bayesPF <- function(formula, data, link, adaptive_pooling = FALSE,
       chains     = chains,
       thin       = thin, ...)
   } else {
-    message("If you don't want to return samples, you may also want to consider the function f2stan() to generate the Stan code.")
+    message(paste("If you don't want to return samples, you may also want to",
+                  "consider the function f2stan() to generate the Stan code."))
   }
 
   # Return the results

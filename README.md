@@ -76,7 +76,7 @@ specified as the number of success, \(y\), given a number of trials,
 
 This package assumes a basic model shown below
 
-![Equation](https://latex.codecogs.com/png.latex?%5Cbegin%7Balign*%7D%20F%28%5Cpi%29%20%26%3D%20%5Calpha%20&plus;%20%5Cbeta%5Ctimes%20x%20%5C%5C%20y%20%26%5Csim%20%5Ctext%7BBinomial%7D%28k%2C%20%5Cpi%29%20%5Cend%7Balign*%7D)
+![Equation](https://latex.codecogs.com/png.latex?%5Cbegin%7Balign*%7D%20F%28%5Cpi%29%20%26%3D%20%5Calpha%20+%20%5Cbeta%5Ctimes%20x%20%5C%5C%20y%20%26%5Csim%20%5Ctext%7BBinomial%7D%28k%2C%20%5Cpi%29%20%5Cend%7Balign*%7D)
 
 where \(F\) is the link function (either *logit* or *probit*). Where
 factor (or categorical) variables are included in the model, they will
@@ -121,6 +121,16 @@ Equation](https://latex.codecogs.com/png.latex?%5Cbegin%7Balign*%7D%20F%28%5Cpi%
 <!-- $$ -->
 
 where x1, x2, … are continuous predictors specified in the model.
+
+# Adaptive Pooling
+
+Adaptive pooling is a functionality that allows for multilevel
+(heirarchical) modeling. It essentially allows information to be shared
+across different levels in the presence of factor variables (see
+McElreath, Statistical Rethinking). This feature generally has the
+benefit of acting as a regularization among parameters, and in some
+cases it can overcome the problem of complete separation among
+categories and the response.
 
 # Other Thoughts
 

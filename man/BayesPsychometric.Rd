@@ -4,7 +4,10 @@
 \name{BayesPsychometric}
 \alias{BayesPsychometric}
 \alias{BayesPsychometric-package}
-\title{BayesPsychometric: A package for fitting psychometric functions using the power of Bayesian statistics and Hamiltonian Monte Carlo sampling.}
+\title{BayesPsychometric: A package for fitting psychometric functions using the
+  power of Bayesian statistics and Hamiltonian Monte Carlo sampling.}
 \description{
-The BayesPsychometric provides one main function, bayesPF, and helper functions that operate on the output of bayesPF.
+The BayesPsychometric provides two main functions: 1) `bayesPF` which will
+  fit a logistic model using Stan, and 2) `f2stan` which builds up the
+  Stan code from a formula and data frame.
 }

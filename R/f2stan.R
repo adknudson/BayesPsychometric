@@ -1,10 +1,11 @@
-#' Convert a typical formula to a formula list that map2stan can understand
+#' Convert a typical logistic equation formula into a Stan code
 #'
 #' @param formula A formula that you would pass to `glm` or similar.
 #' @param data A data frame of observations.
 #' @param link A link function (either "logit" or "probit")
 #' @param adaptive_pooling Logical (FALSE by default) Specifies whether
-#'   adaptive pooling should be used when fitting the model
+#'   adaptive pooling should be used when fitting the model. Requires that
+#'   both an intecept and factor variables are included in the formula.
 #' @return A model and data that can be used by `rstan::stan` as well as
 #'   information about the model and the data.
 #' @export

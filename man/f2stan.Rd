@@ -2,7 +2,7 @@
 % Please edit documentation in R/f2stan.R
 \name{f2stan}
 \alias{f2stan}
-\title{Convert a typical formula to a formula list that map2stan can understand}
+\title{Convert a typical logistic equation formula into a Stan code}
 \usage{
 f2stan(formula, data, link = c("logit", "probit"),
   adaptive_pooling = FALSE)
@@ -15,12 +15,13 @@ f2stan(formula, data, link = c("logit", "probit"),
 \item{link}{A link function (either "logit" or "probit")}
 
 \item{adaptive_pooling}{Logical (FALSE by default) Specifies whether
-adaptive pooling should be used when fitting the model}
+adaptive pooling should be used when fitting the model. Requires that
+both an intecept and factor variables are included in the formula.}
 }
 \value{
 A model and data that can be used by `rstan::stan` as well as
   information about the model and the data.
 }
 \description{
-Convert a typical formula to a formula list that map2stan can understand
+Convert a typical logistic equation formula into a Stan code
 }

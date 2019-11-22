@@ -39,7 +39,7 @@ glimpse(dat)
 **Formula**
 
 ```{r}
-(f <- y|k ~ x1 + x2 + age + gender)
+(f <- y|k ~ x1 + age + gender)
 ```
 
 **Link Function**
@@ -303,8 +303,6 @@ m_prior
 **data**
 
 ```{r}
-nvs_class <- metadata$class$numeric
-
 body_data <- concat(
   indent, "// Number of observations, factor levels, etc.\n",
   indent, "int<lower=1> N;\n"
@@ -365,18 +363,20 @@ cat(concat(
 **transformed data**
 
 ```{r}
-body_transformed_data <- NULL
 if (length(nvs) > 0) {
-  body_transformed_data <- concat(
-    body_transformed_data,
-    indent, "// Standardized Data\n"
-  )
+  body_td_dec  <- NULL
+  body_td_calc <- NULL
   for (nv in nvs) {
-    body_transformed_data <- concat(
-      body_transformed_data,
-      indent, "real mu_", nv, " = mean(", nv, ");\n",
-      indent, "real sd_", nv, " = sd(", nv, ");\n",
-      indent, "vector[N] ", nv, "_std;\n",
+    body_td_dec <- concat(
+      body_td_dec,
+      indent, "real mu_", nv, ";\n",
+      indent, "real sd_", nv, ";\n",
+      indent, "vector[N] ", nv, "_std;\n\n"
+    )
+    body_td_calc <- concat(
+      body_td_calc, "\n",
+      indent, "mu_", nv, " = mean(", nv, ");\n",
+      indent, "sd_", nv, " = sd(", nv, ");\n",
       indent, nv, "_std = (", nv, " - mu_", nv, ") / sd_", nv, ";\n"
     )
   }
@@ -384,7 +384,8 @@ if (length(nvs) > 0) {
 
 cat(concat(
   "transformed data{\n",
-    body_transformed_data,
+    body_td_dec,
+    body_td_calc,
   "}\n"
 ))
 ```
@@ -394,7 +395,7 @@ cat(concat(
 
 ```{r}
 body_parameters <- ""
-coef_list <- metadata$coefs
+m_coef <- metadata$coefs
 
 # Intercept terms
 if (has_intercept) {
@@ -440,7 +441,7 @@ if (adaptive_pooling && length(fvs) > 0) {
     body_parameters, "\n",
     indent, "// Adaptive Pooling terms\n"
   )
-  for (coefs in coef_list) {
+  for (coefs in m_coef) {
     for (coef in coefs[-1]) {
       body_parameters <- concat(
         body_parameters,
@@ -641,7 +642,8 @@ stan_model <- concat(
     body_data,
   "}\n",
   "transformed data{\n",
-    body_transformed_data,
+    body_td_dec,
+    body_td_calc,
   "}\n",
   "parameters{\n",
     body_parameters,
@@ -662,8 +664,9 @@ cat(stan_model)
 # Model Fit
 
 ```{r}
-ret <- c("alpha", "alpha_age", "alpha_gender", "beta_x1", "beta_x2", "beta_x1_age", "beta_x1_gender", "beta_x2_age", "beta_x2_gender")
+ret <- c("alpha", "alpha_age", "alpha_gender", "beta_x1", "beta_x1_age", "beta_x1_gender")
 
-fit <- stan(file = "test_stan.stan", data = dat, pars = ret)
+fit <- stan(model_code = stan_model, data = dat, pars = ret)
+shinystan::launch_shinystan(fit)
 ```
 

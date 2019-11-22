@@ -4,14 +4,18 @@
 \alias{f2stan}
 \title{Convert a typical formula to a formula list that map2stan can understand}
 \usage{
-f2stan(formula, data, link, adaptive_pooling = FALSE)
+f2stan(formula, data, link = c("logit", "probit"),
+  adaptive_pooling = FALSE)
 }
 \arguments{
 \item{formula}{A formula that you would pass to `glm` or similar.}
 
 \item{data}{A data frame of observations.}
 
-\item{link}{A link function such as "logit" or "probit"}
+\item{link}{A link function (either "logit" or "probit")}
+
+\item{adaptive_pooling}{Logical (FALSE by default) Specifies whether
+adaptive pooling should be used when fitting the model}
 }
 \value{
 A model and data that can be used by `rstan::stan` as well as

@@ -1,30 +1,12 @@
-##############################################################################
-#
-# Utility functions for f2stan. These are not meant to be called directly by
-# the user, so are not exported in the namespace. For ease of mainentance,
-# these functions are listed in the order that they get called within the main
-# function. A short description is provided for each function.
-#
-##############################################################################
+# Process the formula ========================================================
+process_formula <- function(f) {
+  f_str  <- as.character(f)
+  f_terms <- terms(f)
+  f_vars <- attr(f_terms, "term.labels")
+  f_int  <- as.logical(attr(f_terms, "intercept"))
 
-#============================================================================= .extractFromFormula
-#' Returns a decomposed formula
-#'
-#' Takes in a formula such as
-#'
-#'     y|k ~ x1 + x2 + factor1 + factor 2
-#'
-#' and extracts helpful information like terms, response, intercept, etc.
-#' @noRd
-.extractFromFormula <- function(formula) {
-
-  fstr  <- as.character(formula)
-  fterm <- terms(formula)
-  fvars <- attr(fterm, "term.labels")
-  fint  <- as.logical(attr(fterm, "intercept"))
-
-  LHS   <- fstr[2]
-  RHS   <- fstr[3]
+  LHS <- f_str[2]
+  RHS <- f_str[3]
 
   if (grepl(pattern = "\\|", LHS)) {
     data_mode <- "binomial"
@@ -33,368 +15,110 @@
     data_mode <- "bernoulli"
   }
 
-  # Assertions
-  assertthat::assert_that(
-    length(LHS) %in% c(1,2),
-    msg = paste("The number of arguments on the left hand side of the equation must be 1 (for bernoulli data) or 2 (for binomial data). The number of args on the LHS is", length(LHS))
-  )
-  assertthat::assert_that(
-    all(attr(fterm, "order") == 1),
-    msg = "The order of all variables must be 1 (linear)."
-  )
-  # Maybe disallow users from specifying a model with no intercept?
-  if (!fint) {
-    warning("Specifying a model with no intercept implicitly constrains the y-intercept to be 0.5 (0 on the log-odds scale).")
-  }
-
-  list(vars = fvars,
-       LHS = LHS,
-       RHS = RHS,
-       include_intercept = fint,
+  list(vars = f_vars,
+       LHS  = LHS,
+       RHS  = RHS,
+       has_intercept = f_int,
        data_mode = data_mode)
 }
 
 
-#============================================================================= .getDataClasses
-# Which variables are numeric? factor? character? predictor? response? etc.
-.getDataClasses <- function(fls, data) {
+# Get the metadata ===========================================================
+get_metadata <- function(data, f_ls) {
 
-  vars      <- fls[["vars"]]
-  LHS       <- fls[["LHS"]]
-  data_mode <- fls[["data_mode"]]
+  classes <- purrr::map(data, ~class(.x)[1])
 
-  # Get the class of each column ---------------------------------------------
-  # Ordered factors have two classes (ordered, factor) so get just the first
-  metadata <- unlist(lapply(data, function(col) class(col)[1]))
-  # data_names <- names(data)
+  LHS <- f_ls[["LHS"]]
+  f_vars <- f_ls[["vars"]]
+  has_intercept <- f_ls[["has_intercept"]]
 
-  # Split up the classes by part of formula ----------------------------------
   response_vars <- LHS
-  response_class <- metadata[response_vars]
+  numeric_vars <- subset(f_vars, classes[f_vars] %in% c("numeric", "integer"))
+  factor_vars <- subset(f_vars, classes[f_vars] %in% c("factor", "ordered"))
+  character_vars <- subset(f_vars, classes[f_vars] == "character")
 
-  numeric_vars <- subset(vars, metadata[vars] %in% c("numeric", "integer"))
-  numeric_class <- metadata[numeric_vars]
+  response_class <- classes[response_vars]
+  numeric_class <- classes[numeric_vars]
+  factor_class <- classes[factor_vars]
 
-  factor_vars <- subset(vars, metadata[vars] %in% c("factor", "ordered"))
-  factor_class <- metadata[factor_vars]
-
-  character_vars <- subset(vars, metadata[vars] == "character")
-
-  # Assertions ---------------------------------------------------------------
-  assertthat::assert_that(
-    assertthat::has_name(data, c(LHS, vars)),
-    msg = "One or more of the variables in the formula is not a variable in the data."
-  )
-  assertthat::assert_that(
-    all(response_class == "integer"),
-    msg = paste("The response variable(s) must be integers.", paste(names(response), "is type", response, collapse = "; "))
-  )
-  assertthat::assert_that(
-    all(data[response_vars] >= 0),
-    msg = "The response variables must all be non-negative integers."
-  )
-  assertthat::assert_that(
-    !("character" %in% c(numeric_class, factor_class)),
-    msg = "The predictor variables must not be of type 'character'. Please make sure that they are either of type 'integer', 'numeric', or 'factor'."
-  )
-  if (data_mode == "binomial") {
-    successes <- data[[response_vars[1]]]
-    size <- data[[response_vars[2]]]
-    assertthat::assert_that(
-      all(successes <= size),
-      msg = "In a binomial distribution, the number of successes must be less than or equal to the size of the draw. Please validate your response variables."
-    )
-  }
-  # I can probably implicitly handle this case internally, but my gut says
-  # that is better to complain to the user so that they are aware of the
-  # implications. I.e. the internal factor level may not match the external
-  # data.
-  if (length(factor_vars) > 0) {
-    for (fv in factor_vars) {
-      assertthat::assert_that(
-        length(levels(data[[fv]])) == length(unique(data[[fv]])),
-        msg = paste("The number of levels in", fv, "do not match the number of unique values. This could be because 1 or more levels are excluded from the data. Please refactor and try again."))
-    }
-  }
-
-  list(
-    vars = list(response = response_vars,
-                numeric = numeric_vars,
-                factor = factor_vars),
-    class = list(response = response_class,
-                 numeric = numeric_class,
-                 factor = factor_class)
-  )
-}
-
-
-#============================================================================= .preProcessData
-# Scale any numeric predictors so that default priors are on a more common
-# scale with the estimated coefficients.
-.preProcessData <- function(fls, data) {
-
-  has_intercept <- fls[["include_intercept"]]
-
-  # We call metadata in here because standardizing will change integer
-  # predictors to numeric, and we want that change to be reflected later on
-  metadata <- .getDataClasses(fls, data)
-  nvs <- metadata[["vars"]][["numeric"]]
-
-  # if there are numeric variables, standardize them
-  if (length(nvs) > 0) {
-    for (nv in nvs) {
-      # Drop needs to be used to return a vector while keeping the attributes
-      if (has_intercept) {
-        data[[nv]] <- drop(scale(data[[nv]]))
-      } else {
-        # Centering artificially introduces an intercept. We don't want to do
-        # that if no intercept is specified.
-        data[[nv]] <- drop(scale(data[[nv]], center = FALSE))
-      }
-    }
-  }
-
-  data
-}
-
-
-#============================================================================= .buildDistributionFormula
-# Four cases determined by a mix of bernoulli/binomial, logit/probit
-.buildDistributionFormula <- function(fls, link) {
-
-  data_mode <- fls[["data_mode"]]
-  LHS       <- fls[["LHS"]]
-
-  assertthat::assert_that(
-    link %in% c("logit", "probit"),
-    msg = "'Link' function must be either 'logit' or 'probit'."
-  )
-  assertthat::assert_that(
-    data_mode %in% c("bernoulli", "binomial"),
-    msg = "Data must be either in bernoulli form (0's and 1's) or binomial form (k successes in n trials)."
-  )
-
-  if (data_mode == "bernoulli" && link == "logit") {
-
-    # Bernoulli logit --------------------------------------------------------
-    m_dist <- paste0(LHS, " ~ bernoulli_logit(theta)")
-
-  } else if (data_mode == "bernoulli" && link == "probit") {
-
-    # Bernoulli probit -------------------------------------------------------
-    m_dist <- paste0(LHS, " ~ bernoulli(theta)")
-
-  } else if (data_mode == "binomial" && link == "logit") {
-
-    # Binomial logit ---------------------------------------------------------
-    successes <- LHS[1]
-    trials    <- LHS[2]
-    m_dist <- paste0(successes, " ~ binomial_logit(", trials,", theta)")
-
-  } else if (data_mode == "binomial" && link == "probit") {
-
-    # Binomial probit --------------------------------------------------------
-    successes <- LHS[1]
-    trials    <- LHS[2]
-    m_dist <- paste0(successes, " ~ binomial(", trials, ", theta)")
-
-  } else {
-    stop("The model is not 'bernoulli' or 'binomial', and the link is not 'logit' or 'probit'.")
-  }
-
-  m_dist
-}
-
-
-#============================================================================= .buildLinearModel
-# There are 8 cases a user can specify based on if a model has numeric
-# variables, factor variables, and an intercept.
-.buildLinearModel <- function(metadata, has_intercept) {
-
-  nvs <- metadata[["vars"]][["numeric"]]
-  fvs <- metadata[["vars"]][["factor"]]
+  nvs <- numeric_vars
+  fvs <- factor_vars
+  cvs <- character_vars
 
   has_numeric <- length(nvs) > 0
   has_factor <- length(fvs) > 0
+  has_character <- length(cvs) > 0
 
+  assertthat::assert_that(
+    !has_character,
+    msg = paste("The model must not contain character variables.",
+                "The offending",
+                ifelse(length(cvs) == 1, "variable is:\n\t", "variables are:\n\t"),
+                cvs, "\nDid you mean for these to be factor variables instead?")
+  )
+
+  # Get list of internal coefficients
+  ret_list <- list()
   if (!has_numeric && !has_factor && !has_intercept) {
-
     # y ~ 0
-    stop("ERROR: You cannot specify an empty model")
+    stop("You must specify a non-null model to fit.")
 
   } else if (has_numeric && !has_factor && !has_intercept ) {
-
     # y ~ b1*x1 + b2*x2 + ...
-    # creates: bx1, bx2, ...
-    m <- paste0("b", nvs)
-    # creates: bx1*x1 + bx2*x2 + ...
-    m <- paste0(m, " * ", nvs, "[i]", collapse = " + ")
-    return(m)
+    ret_list[[length(ret_list) + 1]] <- paste0("b_", nvs)
 
   } else if (!has_numeric && has_factor && !has_intercept) {
-
     # y ~ k1 + k2 + ...
-    warning("Specifying a model with no intercept but also specifying only factor variables is a contradiction. The intercept will be included and estimates will be aggregated at the end.")
-    m <- paste0("a0 + ", paste0("a_", fvs, "[", fvs, "[i]]", collapse = " + "))
-    return(m)
+    ret_list[[length(ret_list) + 1]] <- paste0("a_", fvs)
 
   } else if (!has_numeric && !has_factor && has_intercept) {
-
     # y ~ 1
-    return("a0")
+    ret_list[[length(ret_list) + 1]] <- "a"
 
   } else if (has_numeric && has_factor && !has_intercept) {
-
     # y ~ (bx1 + bx1_k1)*x1 + (bx2 + bx2_k1)*x2 + ...
-    # Builds inner slope (bx1 + bx1_k1 + ...) then the outer product
-    m <- paste0(
-      sapply(seq_along(nvs), function(i) {
-        # creates: bxi_k1 + bxi_k2 + ...
-        inner <- paste0("b", nvs[i], "_", fvs, "[", fvs, "[i]]", collapse = " + ")
-        # creates: bxi + bxi_k1 + bxi_k2 + ...
-        inner <- paste0("b", nvs[i], " + ", inner)
-        # creates: (bxi + bxi_k1 + bxi_k2 + ...)*xi
-        paste0("(", inner, ") * ", nvs[i], "[i]")
-      }),
-      collapse = " + ")
-    return(m)
+    for (nv in nvs) {
+      ret_list[[length(ret_list) + 1]] <- c(paste0("b_", nv), paste0("b_", nv, "_", fvs))
+    }
 
   } else if (has_numeric && !has_factor && has_intercept) {
-
     # y ~ a + b1*x1 + b2*x2 + ...
-    # creates: bx1, bx2, ...
-    m <- paste0("b", nvs)
-    # creates: bx1*x1 + bx2*x2 + ...
-    m <- paste0(m, " * ", nvs, "[i]", collapse = " + ")
-    m <- paste0("a0", " + ", m)
-    return(m)
+    ret_list[[length(ret_list) + 1]] <- "a"
+    ret_list[[length(ret_list) + 1]] <- paste0("b_", nvs)
 
   } else if (!has_numeric && has_factor && has_intercept) {
-
     # y ~ a + k1 + k2 + ...
-    m <- paste0("a0 + ", paste0("a_", fvs, "[", fvs, "[i]]", collapse = " + "))
-    return(m)
+    ret_list[[length(ret_list) + 1]] <- c("a", paste0("a_", fvs))
 
   } else {
-
     # y ~ (a + k) + (bx1 + bx1_k1)*x1 + (bx2 + bx2_k1)*x2 + ...
-    m <- paste0(
-      sapply(seq_along(nvs), function(i) {
-        inner <- paste0("b", nvs[i], "_", fvs, "[", fvs, "[i]]", collapse = " + ")
-        inner <- paste0("b", nvs[i], " + ", inner)
-        paste0("(", inner, ") * ", nvs[i], "[i]")
-      }),
-      collapse = " + ")
-    a0 <- paste0("a0 + ", paste0("a_", fvs, "[", fvs, "[i]]", collapse = " + "))
-    return(paste0(a0, " + ", m))
-  }
-
-}
-
-
-#============================================================================= .buildLinkFormula
-# Bernoulli and Binomial logit have their own functions. Pribt models need to
-# apply the Normal Inverse CDF (Phi) to the linear model
-.buildLinkFormula <- function(metadata, link, has_intercept) {
-
-  # Assertions ---------------------------------------------------------------
-  assertthat::assert_that(
-    link %in% c("logit", "probit"),
-    msg = "'Link' function must be either 'logit' or 'probit'."
-  )
-
-  m_prob <- "theta[i]"
-  m_lm <- .buildLinearModel(metadata, has_intercept)
-
-  # Probit link uses the inverse CDF of the normal distribution, Phi
-  if (link == "probit") {
-    m_lm <- paste0("Phi(", m_lm, ")")
-  }
-
-  paste0(m_prob, " = ", m_lm)
-}
-
-
-#============================================================================= .getModelTerms
-.getModelCoefs <- function(metadata, has_intercept){
-
-  nvs <- metadata[["vars"]][["numeric"]]
-  fvs <- metadata[["vars"]][["factor"]]
-
-  ret_list <- list()
-
-  if (has_intercept) {
-    # Every model with an intercept gets a shared intercept
-    tmp <- "a0"
-    if (length(fvs) > 0) {
-      # Every factor gets an intercept
-      tmp <- c(tmp, paste0("a_", fvs))
-    }
-    ret_list[[1]] <- tmp
-  }
-
-  if(length(nvs) > 0) {
+    ret_list[[length(ret_list) + 1]] <- c("a", paste0("a_", fvs))
     for (nv in nvs) {
-      # Every numeric predictor gets a slope coefficient
-      tmp <- paste0("b", nv)
-      if (length(fvs) > 0) {
-        # Every factor contributes to a change in slope
-        tmp <- c(tmp, paste0("b", nv, "_", fvs))
-      }
-      ret_list[[length(ret_list) + 1]] <- tmp
-    } # for nv
-  } # if nv
-
-  ret_list
-}
-
-
-#============================================================================= .buildPriorFormula
-.buildPriorFormula <- function(m_coefs, adaptive_pooling) {
-
-  if(adaptive_pooling) {
-    ret_list <- list()
-    for (i in m_coefs) {
-      # Prior for the shared coefficient
-      tmp <- paste0(i[1], " ~ normal(0, 10)")
-      # Prior for the factor coefficients
-      tmp <- c(tmp, map(i[-1], ~ paste0(.x, " ~ normal(0, sd_", .x, ")")))
-      # Prior for the shared standard deviation for adaptive pooling
-      tmp <- c(tmp, map(i[-1], ~ paste0("sd_", .x, " ~ cauchy(0, 2.5)")))
-
-      ret_list[[length(ret_list) + 1]] <- tmp
+      ret_list[[length(ret_list) + 1]] <- c(paste0("b_", nv), paste0("b_", nv, "_", fvs))
     }
-    # Each prior needs to be an element in a list
-    as.list(unlist(ret_list))
-  } else {
-    lapply(unlist(m_coefs), function(var) {
-      paste0(var, " ~ normal(0, 10)")
-    })
   }
+
+  list(vars  = list(response  = response_vars,
+                    numeric   = numeric_vars,
+                    factor    = factor_vars,
+                    character = character_vars),
+       class = list(response = response_class,
+                    numeric  = numeric_class,
+                    factor   = factor_class),
+       coefs = ret_list)
 }
 
 
-#============================================================================= .processData
-# Change factor variables to integer values. Convert data frame to list
-.processData <- function(data, metadata) {
-
-  assertthat::assert_that(
-    !("N" %in% names(data)),
-    msg = "'N' is a reserved variable name in bayesPF. Please rename this column to something else."
-  )
+# Process the data ===========================================================
+# Turn factors into integers, get number of levels, etc.
+process_data <- function(data, metadata) {
 
   fvs <- metadata[["vars"]][["factor"]]
 
-  # Get the number of observations
   N <- nrow(data)
-
-  # Data needs to be a list for rstan::stan
-  data <- as.list(as.data.frame(data))
-
-  # Save total number of observations
+  data <- as.list(data)
   data[["N"]] <- N
 
-  # Convert factors to integers if any factors are specified
   if (length(fvs) > 0) {
     data[paste0("levels_", fvs)] <- lapply(data[fvs], levels)
     data[fvs] <- lapply(data[fvs], as.integer)
@@ -408,39 +132,126 @@
 }
 
 
-#============================================================================= .buildStanCode
-# Workhorse function
-# Creates the Stan code in 3 parts: Data, Parameters, and Model
-.buildStanCode <- function(data, model, fls, metadata) {
-
-  nvs <- metadata[["vars"]][["numeric"]]
-  fvs <- metadata[["vars"]][["factor"]]
-  nvs_class <- metadata[["class"]][["numeric"]]
-
-  coef_list <- metadata[["coefs"]]
-
-  LHS <- fls[["LHS"]]
-  has_intercept <- fls[["include_intercept"]]
-  adaptive_pooling <- fls[["adaptive_pooling"]]
-  data_mode <- fls[["data_mode"]]
-
+# Build the Stan code ========================================================
+make_stan <- function(metadata, f_ls, link) {
   concat <- function(...) {
     paste(..., collapse = "", sep = "")
   }
 
-  indent <- "    "  # indent is four spaces
+  # Set up variables
+  LHS <- f_ls[["LHS"]]
+  nvs <- metadata[["vars"]][["numeric"]]
+  fvs <- metadata[["vars"]][["factor"]]
+  has_intercept <- f_ls[["has_intercept"]]
+  has_numeric <- length(nvs) > 0
+  has_factor <- length(fvs) > 0
+  adaptive_pooling <- f_ls[["adaptive_pooling"]]
+  data_mode <- f_ls[["data_mode"]]
+  m_coefs <- metadata[["coefs"]]
 
-  body_data <- concat(
-    indent, "// Number of observations, factor levels, etc.\n"
+  indent <- "    " # four spaces
+
+  # Create distribution formula ----------------------------------------------
+  m_dist <- switch(
+    paste(data_mode, link),
+    "bernoulli logit"  = paste0(LHS, " ~ bernoulli_logit(theta)"),
+    "bernoulli probit" = paste0(LHS, " ~ bernoulli(theta)"),
+    "binomial logit"   = paste0(LHS[1], " ~ binomial_logit(", LHS[2],", theta)"),
+    "binomial probit"  = paste0(LHS[1], " ~ binomial(", LHS[2],", theta)"),
+    stop("You must specify a valid model: (bernoulli/binomial), (logit/probit)")
   )
-  body_parameters <- ""
-  body_model      <- ""
 
-  # Build data block ---------------------------------------------------------
+  # Create linear model ------------------------------------------------------
+  if (!has_numeric && !has_factor && !has_intercept) {
+    # y ~ 0
+    stop("You must specify a non-null model to fit.")
 
-  # All models should have data => set number of observations to N
+  } else if (has_numeric && !has_factor && !has_intercept ) {
+    # y ~ b1*x1 + b2*x2 + ...
+    # creates: bx1, bx2, ...
+    m <- paste0("b_", nvs)
+    # creates: bx1*x1 + bx2*x2 + ...
+    m <- paste0(m, " * ", nvs, "_std[i]", collapse = " + ")
+
+  } else if (!has_numeric && has_factor && !has_intercept) {
+    # y ~ k1 + k2 + ...
+    m <- paste0("a_", fvs, "[", fvs, "[i]]", collapse = " + ")
+
+  } else if (!has_numeric && !has_factor && has_intercept) {
+    # y ~ 1
+    m <- "a"
+
+  } else if (has_numeric && has_factor && !has_intercept) {
+    # y ~ (bx1 + bx1_k1)*x1 + (bx2 + bx2_k1)*x2 + ...
+    # Builds inner slope (bx1 + bx1_k1 + ...) then the outer product
+    m <- paste0(
+      sapply(seq_along(nvs), function(i) {
+        # creates: bxi_k1 + bxi_k2 + ...
+        inner <- paste0("b_", nvs[i], "_", fvs, "[", fvs, "[i]]", collapse = " + ")
+        # creates: bxi + bxi_k1 + bxi_k2 + ...
+        inner <- paste0("b_", nvs[i], " + ", inner)
+        # creates: (bxi + bxi_k1 + bxi_k2 + ...)*xi
+        paste0("(", inner, ") * ", nvs[i], "_std[i]")
+      }),
+      collapse = " + ")
+
+  } else if (has_numeric && !has_factor && has_intercept) {
+    # y ~ a + b1*x1 + b2*x2 + ...
+    # creates: bx1, bx2, ...
+    m <- paste0("b_", nvs)
+    # creates: bx1*x1 + bx2*x2 + ...
+    m <- paste0(m, " * ", nvs, "_std[i]", collapse = " + ")
+    m <- paste0("a", " + ", m)
+
+  } else if (!has_numeric && has_factor && has_intercept) {
+    # y ~ a + k1 + k2 + ...
+    m <- paste0("a + ", paste0("a_", fvs, "[", fvs, "[i]]", collapse = " + "))
+
+  } else {
+    # y ~ (a + k) + (bx1 + bx1_k1)*x1 + (bx2 + bx2_k1)*x2 + ...
+    m <- paste0(
+      sapply(seq_along(nvs), function(i) {
+        inner <- paste0("b_", nvs[i], "_", fvs, "[", fvs, "[i]]", collapse = " + ")
+        inner <- paste0("b_", nvs[i], " + ", inner)
+        paste0("(", inner, ") * ", nvs[i], "_std[i]")
+      }),
+      collapse = " + ")
+    a <- paste0("a + ", paste0("a_", fvs, "[", fvs, "[i]]", collapse = " + "))
+    m <- paste0(a, " + ", m)
+  }
+
+  # Create link formula ------------------------------------------------------
+  f_link <- switch(
+    link,
+    probit = paste0("theta[i] = Phi(", m, ")"),
+    logit  = paste0("theta[i] = ", m),
+    stop("'Link' function must be either 'logit' or 'probit'.")
+  )
+
+  # Create priors ------------------------------------------------------------
+  if(adaptive_pooling && has_intercept) {
+    ret_list <- list()
+    for (i in m_coefs) {
+      # Prior for the shared coefficient
+      tmp <- paste0(i[1], " ~ normal(0, 5)")
+      # Prior for the factor coefficients
+      tmp <- c(tmp, purrr::map(i[-1], ~ paste0(.x, " ~ normal(0, sd_", .x, ")")))
+      # Prior for the shared standard deviation for adaptive pooling
+      tmp <- c(tmp, purrr::map(i[-1], ~ paste0("sd_", .x, " ~ cauchy(0, 2.5)")))
+
+      ret_list[[length(ret_list) + 1]] <- tmp
+    }
+    # Each prior needs to be an element in a list
+    m_prior <- as.list(unlist(ret_list))
+  } else {
+    m_prior <- lapply(unlist(m_coefs), function(var) {
+      paste0(var, " ~ normal(0, 5)")
+    })
+  }
+
+  # data block ---------------------------------------------------------------
   body_data <- concat(
-    body_data,
+    indent, "// Number of observations, factor levels, etc.\n",
     indent, "int<lower=1> N;\n"
   )
 
@@ -455,121 +266,349 @@
   }
 
   # Response data (bernoulli or binomial)
-  body_data <- concat(body_data, "\n", indent, "// Response Data\n")
+  body_data <- concat(
+    body_data, "\n",
+    indent, "// Response Data\n"
+  )
   if (data_mode == "bernoulli") {
-    body_data <- concat(body_data, indent, "int ", LHS, "[N];\n")
+    body_data <- concat(
+      body_data,
+      indent, "int ", LHS, "[N];\n"
+    )
   } else if (data_mode == "binomial") {
-    body_data <- concat(body_data, indent, "int ", LHS[1], "[N];\n")
-    body_data <- concat(body_data, indent, "int ", LHS[2], "[N];\n")
+    body_data <- concat(
+      body_data,
+      indent, "int ", LHS[1], "[N];\n",
+      indent, "int ", LHS[2], "[N];\n"
+    )
   } else {
     stop("Data responses must be bernoulli or binomial")
   }
 
   # Numeric variables
-  if (length(nvs) > 0) {
-    body_data <- concat(body_data, "\n", indent, "// Numeric Data\n")
-    for(nv in nvs) {
-      # Get the specific type of the numeric variable (numeric or integer)
-      if (nvs_class[nv] == "integer") {
-        nv_type <- "int"
-      } else if (nvs_class[nv] == "numeric") {
-        nv_type <- "real"
-      } else {
-        stop("Predictor variable must be of type 'numeric' or 'integer'.")
-      }
-      body_data <- concat(body_data, indent, nv_type, " ", nv, "[N];\n")
-    }
-  }
+  if (has_numeric) {
+    body_data <- concat(
+      body_data, "\n",
+      indent, "// Numeric Data\n"
+    )
+    for (nv in nvs) {
+      body_data <- concat(
+        body_data,
+        indent, "vector[N] ", nv, ";\n"
+      )
+    } # for nv
+  } # if nv
 
   # Factor variables
-  if (length(fvs) > 0) {
-    body_data <- concat(body_data, "\n", indent, "// Factor Data\n")
+  if (has_factor) {
+    body_data <- concat(
+      body_data, "\n",
+      indent, "// Factor Data\n"
+    )
     for(fv in fvs) {
-      body_data <- concat(body_data, indent, "int ", fv, "[N];\n")
+      body_data <- concat(
+        body_data,
+        indent, "int ", fv, "[N];\n"
+      )
+    } # for fv
+  } # if fv
+
+  # transformed data block ---------------------------------------------------
+  # Only required if there are numeric variables
+  block_transformed_data <- NULL
+  if (has_numeric) {
+    body_td_def  <- NULL
+    body_td_calc <- NULL
+    for (nv in nvs) {
+      body_td_def <- concat(
+        body_td_def,
+        indent, "real mu_", nv, ";\n",
+        indent, "real sd_", nv, ";\n",
+        indent, "vector[N] ", nv, "_std;\n\n"
+      )
+      body_td_calc <- concat(
+        body_td_calc, "\n",
+        indent, "mu_", nv, " = mean(", nv, ");\n",
+        indent, "sd_", nv, " = 2 * sd(", nv, ");\n",
+        indent, nv, "_std = (", nv, " - mu_", nv, ") / sd_", nv, ";\n"
+      )
     }
+    block_transformed_data <- concat(
+      "transformed data{\n",
+      body_td_def,
+      body_td_calc,
+      "}\n"
+    )
   }
 
-  # Build parameters block ---------------------------------------------------
+  # parameters block ---------------------------------------------------------
+  body_parameters <- NULL
 
-  # Intercept terms
-  if (has_intercept) {
-    body_parameters <- concat(body_parameters, indent, "// Intercept terms\n")
-    body_parameters <- concat(body_parameters, indent, "real a0;\n")
-    # Add vectors for factors if any are in the model
-    if (length(fvs) > 0) {
-      for (fv in fvs) {
-        body_parameters <- concat(
-          body_parameters,
-          indent, "vector[N_", fv, "] a_", fv, ";\n"
-        )
-      } # for fv
-    } # if has factors
-  } # if has intercept
+  if (!has_numeric && !has_factor && !has_intercept) {
+    # y ~ 0
+    stop("You must specify a non-null model to fit.")
 
-  # Slope terms
-  if (length(nvs) > 0) {
+  } else if (has_numeric && !has_factor && !has_intercept ) {
+    # y ~ b1*x1 + b2*x2 + ...
     body_parameters <- concat(
-      body_parameters, "\n",
-      indent, "// Slope terms\n"
+      indent, "// Slope terms\n",
+      concat(indent, "real b_", nvs, ";\n")
+    )
+
+  } else if (!has_numeric && has_factor && !has_intercept) {
+    # y ~ k1 + k2 + ...
+    body_parameters <- concat(
+      indent, "// Intercept terms\n",
+      concat(indent, "vector[N_", fvs, "] a_", fvs, ";\n")
+    )
+
+  } else if (!has_numeric && !has_factor && has_intercept) {
+    # y ~ 1
+    body_parameters <- concat(
+      indent, "// Intercept terms\n",
+      indent, "real a;\n"
+    )
+
+  } else if (has_numeric && has_factor && !has_intercept) {
+    # y ~ (bx1 + bx1_k1)*x1 + (bx2 + bx2_k1)*x2 + ...
+    body_parameters <- concat(
+      indent, "// Slope terms\n",
+      concat(indent, "real b_", nvs, ";\n")
     )
     for (nv in nvs) {
       body_parameters <- concat(
         body_parameters,
-        indent, "real b", nv, ";\n"
+        concat(indent, "vector[N_", fvs, "] b_", nv, "_", fvs, ";\n")
       )
-      # Factor slope terms
-      if (length(fvs) > 0) {
-        for (fv in fvs) {
-          body_parameters <- concat(
-            body_parameters,
-            indent, "vector[N_", fv, "] b", nv, "_", fv, ";\n"
-          )
-        } # for fv
-      } # if fv
-    } # for nv
-  } # if nv
+    }
+
+  } else if (has_numeric && !has_factor && has_intercept) {
+    # y ~ a + b1*x1 + b2*x2 + ...
+    body_parameters <- concat(
+      indent, "// Intercept terms\n",
+      indent, "real a;\n\n",
+      indent, "// Slope terms\n",
+      concat(indent, "real b_", nvs, ";\n")
+    )
+
+  } else if (!has_numeric && has_factor && has_intercept) {
+    # y ~ a + k1 + k2 + ...
+    body_parameters <- concat(
+      indent, "// Intercept terms\n",
+      indent, "real a;\n",
+      concat(indent, "vector[N_", fvs, "] a_", fvs, ";\n")
+    )
+
+  } else {
+    # y ~ (a + k) + (bx1 + bx1_k1)*x1 + (bx2 + bx2_k1)*x2 + ...
+    body_parameters <- concat(
+      indent, "// Intercept terms\n",
+      indent, "real a;\n",
+      concat(indent, "vector[N_", fvs, "] a_", fvs, ";\n")
+    )
+    body_parameters <- concat(
+      body_parameters, "\n",
+      indent, "// Slope terms\n",
+      concat(indent, "real b_", nvs, ";\n")
+    )
+    for (nv in nvs) {
+      body_parameters <- concat(
+        body_parameters,
+        concat(indent, "vector[N_", fvs, "] b_", nv, "_", fvs, ";\n")
+      )
+    }
+  }
 
   # Adaptive pooling terms
-  if (adaptive_pooling && length(fvs) > 0) {
+  if (adaptive_pooling && has_factor && has_intercept) {
     body_parameters <- concat(
       body_parameters, "\n",
       indent, "// Adaptive Pooling terms\n"
     )
-    for (coefs in coef_list) {
+    for (coefs in m_coefs) {
       for (coef in coefs[-1]) {
         body_parameters <- concat(
           body_parameters,
-          indent, paste0("real<lower=0> sd_", coef, ";\n")
+          indent, paste0("real<lower=machine_precision()> sd_", coef, ";\n")
         )
       } # for coef
     } # for coef group
   } # if adaptive
 
-  # Build model block --------------------------------------------------------
+  # model block --------------------------------------------------------------
   body_model <- concat(
-    body_model,
     indent, "vector[N] theta;\n\n",
     indent, "// Priors\n",
-    concat(indent, model[["priors"]], ";\n"), "\n",
+    concat(indent, m_prior, ";\n"), "\n",
     indent, "// General linear model\n",
     indent, "for (i in 1:N) {\n",
-    indent, indent, model[["linear_model"]], ";\n",
+    indent, indent, f_link, ";\n",
     indent, "}\n",
-    indent, model[["mode"]], ";\n"
+    indent, m_dist, ";\n"
   )
 
-  # Return the entire model --------------------------------------------------
+  # generated quantities block -----------------------------------------------
+  # Only necessary if there are numeric variables
+  block_generated_quantities <- NULL
+  if (has_numeric) {
+    body_gq_def <- NULL
+
+    # Intercept terms
+    if (has_intercept) {
+      body_gq_def <- concat(
+        body_gq_def,
+        indent, "// Intercept terms\n",
+        indent, "real alpha;\n"
+      )
+      # Add vectors for factors if any are in the model
+      if (has_factor) {
+        for (fv in fvs) {
+          body_gq_def <- concat(
+            body_gq_def,
+            indent, "vector[N_", fv, "] alpha_", fv, ";\n"
+          )
+        } # for fv
+      } # if has factors
+    } # if has intercept
+
+    # Slope terms
+    body_gq_def <- concat(
+      body_gq_def, "\n",
+      indent, "// Slope terms\n"
+    )
+    for (nv in nvs) {
+      body_gq_def <- concat(
+        body_gq_def,
+        indent, "real beta_", nv, ";\n"
+      )
+      # Factor slope terms
+      if (length(fvs) > 0) {
+        for (fv in fvs) {
+          body_gq_def <- concat(
+            body_gq_def,
+            indent, "vector[N_", fv, "] beta_", nv, "_", fv, ";\n"
+          )
+        } # for fv
+      } # if fv
+    } # for nv
+
+    body_gq_calc <- concat(
+      indent, "// Calculations\n"
+    )
+    if (!has_numeric && !has_factor && !has_intercept) {
+      # y ~ 0
+
+    } else if (has_numeric && !has_factor && !has_intercept ) {
+      # y ~ bx1*x1 + bx2*x2 + ...
+      for (nv in nvs) {
+        body_gq_calc <- concat(
+          body_gq_calc,
+          indent, "beta_", nv, " = b_", nv, " / sd_", nv, ";\n"
+        )
+      }
+
+    } else if (!has_numeric && has_factor && !has_intercept) {
+      # y ~ k1 + k2 + ...
+      # nothing to do
+
+    } else if (!has_numeric && !has_factor && has_intercept) {
+      # y ~ 1
+      # nothing to do
+
+    } else if (has_numeric && has_factor && !has_intercept) {
+      # y ~ (bx1 + bx1_k1)*x1 + (bx2 + bx2_k1)*x2 + ...
+      for (nv in nvs) {
+        body_gq_calc <- concat(
+          body_gq_calc,
+          indent, "beta_", nv, " = b_", nv, " / sd_", nv, ";\n"
+        )
+        for (fv in fvs) {
+          body_gq_calc <- concat(
+            body_gq_calc,
+            indent, "beta_", nv, "_", fv, " = b_", nv, "_", fv, " / sd_", nv, ";\n"
+          )
+        }
+      }
+
+    } else if (has_numeric && !has_factor && has_intercept) {
+      # y ~ a + b1*x1 + b2*x2 + ...
+
+      # Process alpha = a - b1*mu_x1/sd_x1 - b2*mu_x2/sd_x2 - ...
+      tmp <- paste0("b_", nvs, " * mu_", nvs, " / sd_", nvs, collapse = " - ")
+      body_gq_calc <- concat(
+        body_gq_calc,
+        indent, "alpha = a - ", tmp, ";\n"
+      )
+
+      # Process beta_xi = b_xi / sd_xi
+      for (nv in nvs) {
+        body_gq_calc <- concat(
+          body_gq_calc,
+          indent, "beta_", nv, " = b_", nv, " / sd_", nv, ";\n"
+        )
+      }
+
+    } else if (!has_numeric && has_factor && has_intercept) {
+      # y ~ a + k1 + k2 + ...
+      # nothing to do
+
+    } else {
+      # y ~ (a + k) + (bx1 + bx1_k1)*x1 + (bx2 + bx2_k1)*x2 + ...
+
+      # Process alpha = a - b1*mu_x1/sd_x1 - b2*mu_x2/sd_x2 - ...
+      tmp <- paste0("b_", nvs, " * mu_", nvs, " / sd_", nvs, collapse = " - ")
+      body_gq_calc <- concat(
+        body_gq_calc,
+        indent, "alpha = a - ", tmp, ";\n"
+      )
+
+      # Process alpha_k = a_k - b1_k*mu_x1/sd_x1 - b2_k*mu_x2/sd_x2 - ...
+      for (fv in fvs) {
+        tmp <- paste0("b_", nvs, "_", fv, " * mu_", nvs, " / sd_", nvs, collapse = " - ")
+        body_gq_calc <- concat(
+          body_gq_calc,
+          indent, "alpha_", fv, " = a_", fv, " - ", tmp, ";\n"
+        )
+      }
+
+      # Process beta_xi = b_xi / sd_xi
+      for (nv in nvs) {
+        body_gq_calc <- concat(
+          body_gq_calc,
+          indent, "beta_", nv, " = b_", nv, " / sd_", nv, ";\n"
+        )
+      }
+
+      for (nv in nvs) {
+        for (fv in fvs) {
+          body_gq_calc <- concat(
+            body_gq_calc,
+            indent, "beta_", nv, "_", fv, " = b_", nv, "_", fv, " / sd_", nv, ";\n"
+          )
+        } # for fv
+      } # for nv
+    }
+    block_generated_quantities <- concat(
+      "generated quantities{\n",
+      body_gq_def, "\n",
+      body_gq_calc,
+      "}\n"
+    )
+  } # if has nvs
+
+  # Put it all together ------------------------------------------------------
   concat(
     "data{\n",
-      body_data,
+    body_data,
     "}\n",
-
+    block_transformed_data,
     "parameters{\n",
-      body_parameters,
+    body_parameters,
     "}\n",
-
     "model{\n",
-      body_model,
-    "}\n"
+    body_model,
+    "}\n",
+    block_generated_quantities
   )
+
 }

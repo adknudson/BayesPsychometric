@@ -34,8 +34,8 @@ f2stan <- function(formula,
   metadata <- get_metadata(data, f_ls)
   has_factor <- length(metadata[["vars"]][["factor"]]) > 0
 
-  # Cannot specify a model with adaptive pooling and without factor variables. See the
-  # truth table above because it is the same for factors.
+  # Cannot specify a model with adaptive pooling and without factor variables.
+  # See the truth table above because it is the same for factors.
   assertthat::assert_that(
     !adaptive_pooling || has_factor,
     msg = paste("If adaptive pooling is specified,",

@@ -19,6 +19,7 @@ The function is defined by
 \seealso{
 \code{\link{logistic}}
 
-Other logistic equations: \code{\link{logistic}}
+Other logistic equations: 
+\code{\link{logistic}()}
 }
 \concept{logistic equations}

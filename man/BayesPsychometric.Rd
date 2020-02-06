@@ -3,7 +3,6 @@
 \docType{package}
 \name{BayesPsychometric}
 \alias{BayesPsychometric}
-\alias{BayesPsychometric-package}
 \title{BayesPsychometric: A package for fitting psychometric functions using the
   power of Bayesian statistics and Hamiltonian Monte Carlo sampling.}
 \description{

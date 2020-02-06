@@ -18,6 +18,7 @@ The function is defined by \deqn{\frac{1}{1 + \exp(-x)}}{1 / ( 1 + exp(-x) )}
 \seealso{
 \code{\link{logit}}
 
-Other logistic equations: \code{\link{logit}}
+Other logistic equations: 
+\code{\link{logit}()}
 }
 \concept{logistic equations}

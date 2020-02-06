@@ -4,8 +4,7 @@
 \alias{f2stan}
 \title{Convert a typical logistic equation formula into a Stan code}
 \usage{
-f2stan(formula, data, link = c("logit", "probit"),
-  adaptive_pooling = FALSE)
+f2stan(formula, data, link = c("logit", "probit"), adaptive_pooling = FALSE)
 }
 \arguments{
 \item{formula}{A formula that you would pass to `glm` or similar.}
